@@ -1,951 +1,1420 @@
-const CONFIG = {
-  HOJA_USUARIOS: "Usuarios",
+<!DOCTYPE html>
+<html lang="es">
 
-  // Sin acento en Vehiculos y con espacio final.
-  HOJA_ESTADO: "APP Estado Vehiculos ",
+<head>
+  <meta charset="UTF-8">
 
-  CLAVE_PWA: "ESTACIONAMIENTO_NFC_2026_PWA",
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  GOOGLE_CLIENT_ID:
-    "979392516075-ch3kg5n5fdbf9uco2ts2csr4motjfuqi.apps.googleusercontent.com",
+  <title>Estacionamiento NFC</title>
 
-  LUGARES_VALIDOS: [
-    "Adelante",
-    "Medio",
-    "Atrás"
-  ]
-};
+  <link
+    rel="manifest"
+    href="./manifest.json"
+  >
 
-
-/* =====================================================
-   GET
-   ===================================================== */
-
-function doGet(e) {
-  try {
-    const p = e && e.parameter ? e.parameter : {};
-
-    // Consultar registro de dispositivo.
-    if (p.accion === "registro" && p.id) {
-      const resultado =
-        leerJSONPropiedad_("registro_" + String(p.id).trim());
-
-      return respuestaJSON_(
-        resultado || {
-          ok: true,
-          estado: "pendiente"
-        }
-      );
-    }
-
-    // Consultar resultado de una lectura.
-    if (p.accion === "estado" && p.id) {
-      const resultado =
-        leerResultadoLectura_(String(p.id).trim());
-
-      return respuestaJSON_(
-        resultado || {
-          ok: true,
-          estado: "pendiente"
-        }
-      );
-    }
-
-    return respuestaJSON_({
-      ok: true,
-      estado: "backend_activo"
-    });
-
-  } catch (error) {
-    return respuestaJSON_({
-      ok: false,
-      estado: "error",
-      mensaje: error.message
-    });
-  }
-}
+  <script
+    src="https://accounts.google.com/gsi/client"
+    async
+    defer>
+  </script>
+</head>
 
 
-/* =====================================================
-   POST
-   ===================================================== */
+<body>
 
-function doPost(e) {
-  let id = "";
-
-  try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return respuestaJSON_({
-        ok: false,
-        estado: "solicitud_vacia"
-      });
-    }
-
-    const datos = JSON.parse(e.postData.contents);
-
-    id = String(datos.id || "").trim();
-
-    if (datos.clave !== CONFIG.CLAVE_PWA) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "no_autorizado"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "no_autorizado"
-      });
-    }
+  <h1>🚗 Estacionamiento NFC</h1>
 
 
-    // ---------------------------------------------
-    // REGISTRAR DISPOSITIVO DESPUÉS DE GOOGLE LOGIN
-    // ---------------------------------------------
+  <!-- ===================================================
+       INICIO DE SESIÓN GOOGLE
+       =================================================== -->
 
-    if (datos.accion === "registrar_dispositivo") {
-      return registrarDispositivo_(datos);
-    }
+  <div id="registroUsuario">
 
+    <p>
+      Inicia sesión con tu cuenta de Google:
+    </p>
 
-    // ---------------------------------------------
-    // LECTURA NFC
-    // ---------------------------------------------
+    <div
+      id="g_id_onload"
+      data-client_id="979392516075-ch3kg5n5fdbf9uco2ts2csr4motjfuqi.apps.googleusercontent.com"
+      data-callback="manejarGoogleLogin"
+      data-auto_prompt="false">
+    </div>
 
-    const deviceToken =
-      String(datos.deviceToken || "").trim();
+    <div
+      class="g_id_signin"
+      data-type="standard"
+      data-size="large"
+      data-theme="outline"
+      data-text="signin_with"
+      data-shape="rectangular"
+      data-logo_alignment="left">
+    </div>
 
-    if (!deviceToken) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "dispositivo_no_autorizado"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "dispositivo_no_autorizado"
-      });
-    }
+  </div>
 
 
-    const identidadDispositivo =
-      obtenerDispositivo_(deviceToken);
+  <!-- ===================================================
+       USUARIO AUTORIZADO
+       =================================================== -->
 
-    if (!identidadDispositivo) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "dispositivo_no_autorizado"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "dispositivo_no_autorizado"
-      });
-    }
+  <p
+    id="usuarioActual"
+    style="display:none;">
+  </p>
 
 
-    const ss =
-      SpreadsheetApp.getActiveSpreadsheet();
+  <!-- ===================================================
+       ESTADO
+       =================================================== -->
 
-    const hojaUsuarios =
-      ss.getSheetByName(CONFIG.HOJA_USUARIOS);
-
-    if (!hojaUsuarios) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "hoja_usuarios_no_encontrada"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "hoja_usuarios_no_encontrada"
-      });
-    }
+  <p id="estado">
+    Procesando...
+  </p>
 
 
-    // Volvemos a comprobar Usuarios en CADA lectura.
-    // Así quitar un correo de Sheets también revoca el acceso.
-    const usuario =
-      buscarUsuarioAutorizado_(
-        hojaUsuarios,
-        identidadDispositivo.correo
-      );
+  <!-- ===================================================
+       CAMBIAR CUENTA
+       =================================================== -->
 
-    if (!usuario) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "usuario_no_autorizado"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "usuario_no_autorizado"
-      });
-    }
+  <button
+    id="botonCambiarUsuario"
+    onclick="cambiarUsuario()"
+    style="
+      display:none;
+      margin-top:20px;
+    ">
+    Cambiar usuario
+  </button>
 
 
-    const lugar =
-      String(datos.lugar || "").trim();
 
-    const timestamp =
-      Number(datos.timestamp || 0);
+  <script>
 
+    // =====================================================
+    // CONFIGURACIÓN
+    // =====================================================
 
-    if (!id || !lugar || !timestamp) {
-      finalizarLecturaSiExiste_(
-        id,
-        {
-          ok: false,
-          estado: "datos_incompletos"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "datos_incompletos"
-      });
-    }
+    const ANTIREBOTE_MS =
+      30000;
 
 
-    if (!CONFIG.LUGARES_VALIDOS.includes(lugar)) {
-      finalizarLectura_(
-        id,
-        {
-          ok: false,
-          estado: "lugar_no_valido"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "lugar_no_valido"
-      });
-    }
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbyeLqJYUdKviFeCTLscWYk05RrDX6Z3lsXA0U6BbAz_j1S0GD0t6ch0KX-utOuHg5I1/exec";
 
 
-    const hojaEstado =
-      ss.getSheetByName(CONFIG.HOJA_ESTADO);
-
-    if (!hojaEstado) {
-      finalizarLectura_(
-        id,
-        {
-          ok: false,
-          estado: "hoja_estado_no_encontrada"
-        }
-      );
-
-      return respuestaJSON_({
-        ok: false,
-        estado: "hoja_estado_no_encontrada"
-      });
-    }
+    const CLAVE_PWA =
+      "ESTACIONAMIENTO_NFC_2026_PWA";
 
 
-    // Evitar dos cambios simultáneos.
-    const lock =
-      LockService.getScriptLock();
 
-    lock.waitLock(10000);
+    // =====================================================
+    // LUGAR NFC
+    // =====================================================
 
-    try {
-      const resultado =
-        procesarLecturaPendiente_(
-          hojaEstado,
-          lugar,
-          usuario.nombre,
-          timestamp,
-          id
+    function obtenerLugar() {
+
+      const params =
+        new URLSearchParams(
+          window.location.search
         );
 
-      return respuestaJSON_(resultado);
-
-    } finally {
-      lock.releaseLock();
+      return params.get("lugar");
     }
 
-  } catch (error) {
-    finalizarLecturaSiExiste_(
-      id,
-      {
-        ok: false,
-        estado: "error",
-        mensaje: error.message
-      }
-    );
-
-    return respuestaJSON_({
-      ok: false,
-      estado: "error",
-      mensaje: error.message
-    });
-  }
-}
 
 
-/* =====================================================
-   REGISTRAR DISPOSITIVO
-   ===================================================== */
+    // =====================================================
+    // IDENTIDAD LOCAL VALIDADA
+    // =====================================================
 
-function registrarDispositivo_(datos) {
-  const id =
-    String(datos.id || "").trim();
+    function obtenerCorreo() {
 
-  const googleToken =
-    String(datos.googleToken || "").trim();
-
-  if (!id || !googleToken) {
-    guardarJSONPropiedad_(
-      "registro_" + id,
-      {
-        ok: false,
-        estado: "datos_incompletos"
-      }
-    );
-
-    return respuestaJSON_({
-      ok: false,
-      estado: "datos_incompletos"
-    });
-  }
-
-
-  const identidad =
-    verificarGoogleToken_(googleToken);
-
-  if (!identidad.ok) {
-    const resultado = {
-      ok: false,
-      estado: "token_google_invalido"
-    };
-
-    guardarJSONPropiedad_(
-      "registro_" + id,
-      resultado
-    );
-
-    return respuestaJSON_(resultado);
-  }
-
-
-  const ss =
-    SpreadsheetApp.getActiveSpreadsheet();
-
-  const hojaUsuarios =
-    ss.getSheetByName(CONFIG.HOJA_USUARIOS);
-
-  if (!hojaUsuarios) {
-    const resultado = {
-      ok: false,
-      estado: "hoja_usuarios_no_encontrada"
-    };
-
-    guardarJSONPropiedad_(
-      "registro_" + id,
-      resultado
-    );
-
-    return respuestaJSON_(resultado);
-  }
-
-
-  const usuario =
-    buscarUsuarioAutorizado_(
-      hojaUsuarios,
-      identidad.email
-    );
-
-
-  if (!usuario) {
-    const resultado = {
-      ok: false,
-      estado: "usuario_no_autorizado"
-    };
-
-    guardarJSONPropiedad_(
-      "registro_" + id,
-      resultado
-    );
-
-    return respuestaJSON_(resultado);
-  }
-
-
-  // Credencial aleatoria del dispositivo.
-  const deviceToken =
-    Utilities.getUuid() +
-    "-" +
-    Utilities.getUuid();
-
-
-  guardarJSONPropiedad_(
-    "dispositivo_" + deviceToken,
-    {
-      correo: identidad.email,
-      nombre: usuario.nombre,
-      creado: Date.now()
+      return localStorage.getItem(
+        "correoGoogle"
+      );
     }
-  );
 
 
-  const resultado = {
-    ok: true,
-    estado: "autorizado",
-    usuario: usuario.nombre,
-    correo: identidad.email,
-    deviceToken: deviceToken
-  };
+    function obtenerUsuarioValidado() {
+
+      return localStorage.getItem(
+        "usuarioValidado"
+      );
+    }
 
 
-  guardarJSONPropiedad_(
-    "registro_" + id,
-    resultado
-  );
+    function obtenerDeviceToken() {
+
+      return localStorage.getItem(
+        "deviceToken"
+      );
+    }
 
 
-  return respuestaJSON_(resultado);
-}
+    function sesionLista() {
+
+      return Boolean(
+        obtenerCorreo() &&
+        obtenerUsuarioValidado() &&
+        obtenerDeviceToken()
+      );
+    }
 
 
-/* =====================================================
-   DISPOSITIVO
-   ===================================================== */
 
-function obtenerDispositivo_(token) {
-  return leerJSONPropiedad_(
-    "dispositivo_" + token
-  );
-}
+    // =====================================================
+    // GOOGLE LOGIN
+    // =====================================================
 
+    async function manejarGoogleLogin(response) {
 
-/* =====================================================
-   VERIFICAR GOOGLE
-   ===================================================== */
+      try {
 
-function verificarGoogleToken_(token) {
-  try {
-    const url =
-      "https://oauth2.googleapis.com/tokeninfo?id_token=" +
-      encodeURIComponent(token);
+        mostrarEstado(
+          "🔐 Validando tu cuenta..."
+        );
 
 
-    const respuesta =
-      UrlFetchApp.fetch(
-        url,
-        {
-          method: "get",
-          muteHttpExceptions: true
+        const registroId =
+          crypto.randomUUID();
+
+
+        // Enviar token firmado de Google a Apps Script
+        await fetch(
+          BACKEND_URL,
+          {
+            method: "POST",
+
+            mode: "no-cors",
+
+            headers: {
+              "Content-Type":
+                "text/plain;charset=utf-8"
+            },
+
+            body: JSON.stringify({
+
+              clave:
+                CLAVE_PWA,
+
+              accion:
+                "registrar_dispositivo",
+
+              id:
+                registroId,
+
+              googleToken:
+                response.credential
+
+            })
+          }
+        );
+
+
+        let resultado =
+          null;
+
+
+        // Consultar hasta que Apps Script termine
+        for (
+          let intento = 0;
+          intento < 8;
+          intento++
+        ) {
+
+          await esperar(
+            700
+          );
+
+
+          const consulta =
+            BACKEND_URL +
+            "?accion=registro&id=" +
+            encodeURIComponent(
+              registroId
+            ) +
+            "&t=" +
+            Date.now();
+
+
+          const respuesta =
+            await fetch(
+              consulta,
+              {
+                method: "GET",
+                cache: "no-store"
+              }
+            );
+
+
+          const datos =
+            await respuesta.json();
+
+
+          if (
+            datos.estado &&
+            datos.estado !== "pendiente"
+          ) {
+
+            resultado =
+              datos;
+
+            break;
+          }
         }
+
+
+        // No hubo respuesta definitiva
+        if (!resultado) {
+
+          mostrarEstado(
+            "⏳ No se pudo terminar la validación. Intenta nuevamente."
+          );
+
+          return;
+        }
+
+
+        // Cuenta no autorizada
+        if (
+          resultado.estado ===
+          "usuario_no_autorizado"
+        ) {
+
+          limpiarSesionLocal();
+
+          mostrarEstado(
+            "⛔ Esta cuenta de Google no está autorizada para usar estos cajones."
+          );
+
+          return;
+        }
+
+
+        // Token de Google inválido
+        if (
+          resultado.estado ===
+          "token_google_invalido"
+        ) {
+
+          limpiarSesionLocal();
+
+          mostrarEstado(
+            "🔐 No se pudo validar la cuenta de Google. Intenta iniciar sesión nuevamente."
+          );
+
+          return;
+        }
+
+
+        // Cualquier otro error
+        if (
+          !resultado.ok ||
+          resultado.estado !== "autorizado" ||
+          !resultado.deviceToken ||
+          !resultado.usuario
+        ) {
+
+          limpiarSesionLocal();
+
+          mostrarEstado(
+            "❌ No se pudo autorizar este dispositivo."
+          );
+
+          return;
+        }
+
+
+        // Guardar únicamente identidad ya validada
+        // por Google + Apps Script + hoja Usuarios
+
+        localStorage.setItem(
+          "correoGoogle",
+          resultado.correo
+        );
+
+
+        localStorage.setItem(
+          "usuarioValidado",
+          resultado.usuario
+        );
+
+
+        localStorage.setItem(
+          "deviceToken",
+          resultado.deviceToken
+        );
+
+
+        mostrarSesion();
+
+
+        mostrarEstado(
+          "✅ Acceso autorizado. Usuario: " +
+          resultado.usuario +
+          "."
+        );
+
+
+        // Si el login ocurrió después de escanear una tag,
+        // continuar automáticamente.
+        iniciar();
+
+
+      } catch (error) {
+
+        console.error(
+          "Error en Google Login:",
+          error
+        );
+
+
+        mostrarEstado(
+          "❌ No se pudo validar la cuenta. Revisa tu conexión."
+        );
+      }
+    }
+
+
+
+    // =====================================================
+    // CAMBIAR USUARIO
+    // =====================================================
+
+    function cambiarUsuario() {
+
+      limpiarSesionLocal();
+
+
+      localStorage.removeItem(
+        "ultimaLecturaNFC"
       );
 
 
-    if (respuesta.getResponseCode() !== 200) {
-      return { ok: false };
-    }
-
-
-    const payload =
-      JSON.parse(respuesta.getContentText());
-
-
-    if (
-      payload.aud !==
-      CONFIG.GOOGLE_CLIENT_ID
-    ) {
-      return { ok: false };
-    }
-
-
-    if (
-      payload.iss !== "accounts.google.com" &&
-      payload.iss !== "https://accounts.google.com"
-    ) {
-      return { ok: false };
-    }
-
-
-    const expiracion =
-      Number(payload.exp || 0);
-
-    const ahora =
-      Math.floor(Date.now() / 1000);
-
-
-    if (!expiracion || expiracion <= ahora) {
-      return { ok: false };
-    }
-
-
-    if (
-      String(payload.email_verified).toLowerCase() !==
-      "true"
-    ) {
-      return { ok: false };
-    }
-
-
-    const email =
-      String(payload.email || "")
-        .trim()
-        .toLowerCase();
-
-
-    if (!email) {
-      return { ok: false };
-    }
-
-
-    return {
-      ok: true,
-      email: email,
-      sub: String(payload.sub || "")
-    };
-
-  } catch (error) {
-    console.error(
-      "Error verificando Google:",
-      error
-    );
-
-    return { ok: false };
-  }
-}
-
-
-/* =====================================================
-   USUARIOS
-   ===================================================== */
-
-function buscarUsuarioAutorizado_(
-  hoja,
-  correo
-) {
-  const datos =
-    hoja.getDataRange().getValues();
-
-  if (datos.length < 2) {
-    return null;
-  }
-
-
-  const encabezados =
-    datos[0].map(
-      valor =>
-        normalizarTexto_(valor)
-    );
-
-
-  const indiceNombre =
-    encabezados.indexOf("nombre");
-
-  const indiceCorreo =
-    encabezados.indexOf("correo");
-
-  const indiceActivo =
-    encabezados.indexOf("activo");
-
-
-  if (
-    indiceNombre === -1 ||
-    indiceCorreo === -1
-  ) {
-    throw new Error(
-      "La hoja Usuarios necesita las columnas Nombre y Correo."
-    );
-  }
-
-
-  const correoBuscado =
-    String(correo)
-      .trim()
-      .toLowerCase();
-
-
-  for (let i = 1; i < datos.length; i++) {
-    const nombre =
-      String(
-        datos[i][indiceNombre] || ""
-      ).trim();
-
-
-    const correos =
-      String(
-        datos[i][indiceCorreo] || ""
-      )
-        .split(/[,;\n]+/)
-        .map(
-          valor =>
-            valor
-              .trim()
-              .toLowerCase()
+      document
+        .getElementById(
+          "registroUsuario"
         )
-        .filter(Boolean);
+        .style.display =
+          "block";
 
 
-    if (!correos.includes(correoBuscado)) {
-      continue;
-    }
+      document
+        .getElementById(
+          "usuarioActual"
+        )
+        .style.display =
+          "none";
 
 
-    if (indiceActivo !== -1) {
+      document
+        .getElementById(
+          "botonCambiarUsuario"
+        )
+        .style.display =
+          "none";
+
+
+      mostrarEstado(
+        "Inicia sesión nuevamente con Google."
+      );
+
+
       if (
-        !esActivo_(
-          datos[i][indiceActivo]
-        )
+        window.google &&
+        google.accounts &&
+        google.accounts.id
       ) {
-        return null;
+
+        google.accounts.id
+          .disableAutoSelect();
       }
     }
 
 
-    if (!nombre) {
-      return null;
+    function limpiarSesionLocal() {
+
+      localStorage.removeItem(
+        "correoGoogle"
+      );
+
+      localStorage.removeItem(
+        "usuarioValidado"
+      );
+
+      localStorage.removeItem(
+        "deviceToken"
+      );
     }
 
 
-    return {
-      nombre: nombre,
-      correo: correoBuscado
-    };
-  }
+
+    // =====================================================
+    // MOSTRAR USUARIO
+    // =====================================================
+
+    function mostrarSesion() {
+
+      const usuario =
+        obtenerUsuarioValidado();
 
 
-  return null;
-}
+      const correo =
+        obtenerCorreo();
 
 
-/* =====================================================
-   PROCESAR LECTURA
-   ===================================================== */
+      if (
+        !usuario ||
+        !correo
+      ) {
 
-function procesarLecturaPendiente_(
-  hoja,
-  lugar,
-  usuario,
-  timestamp,
-  id
-) {
-  const resultadoAnterior =
-    leerResultadoLectura_(id);
-
-  if (resultadoAnterior) {
-    return resultadoAnterior;
-  }
+        return;
+      }
 
 
-  const datos =
-    hoja.getDataRange().getValues();
+      document
+        .getElementById(
+          "registroUsuario"
+        )
+        .style.display =
+          "none";
 
 
-  // APP Estado Vehiculos :
-  // B = Posición
-  // E = Coche Actual
-  // F = Hora de Actualización
+      document
+        .getElementById(
+          "usuarioActual"
+        )
+        .style.display =
+          "block";
 
-  let filaLugar = -1;
+
+      document
+        .getElementById(
+          "usuarioActual"
+        )
+        .textContent =
+          "Usuario: " +
+          usuario +
+          " · " +
+          correo;
 
 
-  for (let i = 1; i < datos.length; i++) {
-    const posicion =
-      String(datos[i][1] || "").trim();
-
-    if (
-      posicion.toLowerCase() ===
-      lugar.toLowerCase()
-    ) {
-      filaLugar = i + 1;
-      break;
+      document
+        .getElementById(
+          "botonCambiarUsuario"
+        )
+        .style.display =
+          "inline-block";
     }
-  }
 
 
-  if (filaLugar === -1) {
-    const resultado = {
-      ok: false,
-      estado: "lugar_no_encontrado"
-    };
 
-    finalizarLectura_(id, resultado);
+    // =====================================================
+    // LECTURAS PENDIENTES
+    // =====================================================
 
-    return resultado;
-  }
+    function obtenerPendientes() {
 
+      try {
 
-  const cocheActual =
-    String(
-      hoja
-        .getRange(filaLugar, 5)
-        .getValue() || ""
-    ).trim();
+        const pendientes =
+          JSON.parse(
+            localStorage.getItem(
+              "lecturasPendientes"
+            ) || "[]"
+          );
 
 
-  const ultimaActualizacion =
-    hoja
-      .getRange(filaLugar, 6)
-      .getValue();
+        /*
+        IMPORTANTE:
+
+        Elimina automáticamente lecturas antiguas creadas
+        antes de que existiera el sistema deviceToken.
+
+        Así una lectura vieja no puede provocar después:
+        "dispositivo no autorizado".
+        */
+
+        const validas =
+          pendientes.filter(
+            lectura =>
+              lectura &&
+              lectura.id &&
+              lectura.lugar &&
+              lectura.timestamp &&
+              lectura.deviceToken
+          );
 
 
-  // Si hubo una modificación después del escaneo offline,
-  // esta lectura vieja no se aplica.
-  if (
-    ultimaActualizacion instanceof Date &&
-    ultimaActualizacion.getTime() > timestamp
-  ) {
-    const resultado = {
-      ok: true,
-      estado: "lectura_antigua",
-      usuario: usuario,
-      lugar: lugar
-    };
+        if (
+          validas.length !==
+          pendientes.length
+        ) {
 
-    finalizarLectura_(id, resultado);
-
-    return resultado;
-  }
+          localStorage.setItem(
+            "lecturasPendientes",
+            JSON.stringify(
+              validas
+            )
+          );
+        }
 
 
-  // Mismo usuario -> liberar.
-  if (cocheActual === usuario) {
-    hoja
-      .getRange(filaLugar, 5)
-      .setValue("Libre");
-
-    hoja
-      .getRange(filaLugar, 6)
-      .setValue(new Date(timestamp));
+        return validas;
 
 
-    const resultado = {
-      ok: true,
-      estado: "liberado",
-      lugar: lugar,
-      usuario: usuario
-    };
+      } catch (error) {
 
-    finalizarLectura_(id, resultado);
-
-    return resultado;
-  }
+        localStorage.setItem(
+          "lecturasPendientes",
+          "[]"
+        );
 
 
-  // Otra persona ocupa el cajón.
-  if (
-    cocheActual &&
-    cocheActual !== "Libre"
-  ) {
-    const resultado = {
-      ok: false,
-      estado: "ocupado_por_otro",
-      lugar: lugar,
-      usuario: usuario,
-      ocupante: cocheActual
-    };
-
-    finalizarLectura_(id, resultado);
-
-    return resultado;
-  }
+        return [];
+      }
+    }
 
 
-  // Evitar que una persona esté en dos cajones.
-  for (let i = 1; i < datos.length; i++) {
-    const posicion =
-      String(datos[i][1] || "").trim();
-
-    const ocupante =
-      String(datos[i][4] || "").trim();
-
-
-    if (
-      ocupante === usuario &&
-      posicion.toLowerCase() !==
-      lugar.toLowerCase()
+    function guardarPendientes(
+      pendientes
     ) {
-      const resultado = {
-        ok: false,
-        estado: "usuario_en_otro_lugar",
-        lugar: lugar,
-        usuario: usuario,
-        lugarActual: posicion
+
+      localStorage.setItem(
+        "lecturasPendientes",
+        JSON.stringify(
+          pendientes
+        )
+      );
+    }
+
+
+
+    // =====================================================
+    // GUARDAR LECTURA LOCAL
+    // =====================================================
+
+    function guardarLectura(
+      lugar
+    ) {
+
+      const usuario =
+        obtenerUsuarioValidado();
+
+
+      const correo =
+        obtenerCorreo();
+
+
+      const deviceToken =
+        obtenerDeviceToken();
+
+
+      if (
+        !usuario ||
+        !correo ||
+        !deviceToken
+      ) {
+
+        return {
+
+          aceptada:
+            false,
+
+          mensaje:
+            "🔐 Primero inicia sesión con una cuenta autorizada."
+
+        };
+      }
+
+
+      const ahora =
+        Date.now();
+
+
+      let ultimaLectura =
+        null;
+
+
+      try {
+
+        ultimaLectura =
+          JSON.parse(
+            localStorage.getItem(
+              "ultimaLecturaNFC"
+            ) || "null"
+          );
+
+
+      } catch (error) {
+
+        ultimaLectura =
+          null;
+      }
+
+
+      // ---------------------------------------------
+      // ANTI-REBOTE 30 SEGUNDOS
+      // ---------------------------------------------
+
+      if (
+        ultimaLectura &&
+        ultimaLectura.lugar ===
+          lugar &&
+        ultimaLectura.usuario ===
+          usuario &&
+        ahora -
+          ultimaLectura.timestamp <
+          ANTIREBOTE_MS
+      ) {
+
+        return {
+
+          aceptada:
+            false,
+
+          mensaje:
+            "⏳ Lectura duplicada ignorada. Usuario: " +
+            usuario +
+            "."
+
+        };
+      }
+
+
+      // ---------------------------------------------
+      // CREAR LECTURA
+      // ---------------------------------------------
+
+      const lectura = {
+
+        id:
+          crypto.randomUUID(),
+
+        lugar:
+          lugar,
+
+        usuario:
+          usuario,
+
+        correo:
+          correo,
+
+        deviceToken:
+          deviceToken,
+
+        timestamp:
+          ahora
+
       };
 
-      finalizarLectura_(id, resultado);
 
-      return resultado;
+      const pendientes =
+        obtenerPendientes();
+
+
+      pendientes.push(
+        lectura
+      );
+
+
+      guardarPendientes(
+        pendientes
+      );
+
+
+      localStorage.setItem(
+        "ultimaLecturaNFC",
+        JSON.stringify({
+
+          lugar:
+            lugar,
+
+          usuario:
+            usuario,
+
+          timestamp:
+            ahora
+
+        })
+      );
+
+
+      return {
+
+        aceptada:
+          true,
+
+        mensaje:
+          navigator.onLine
+
+            ? "✅ Lectura registrada. Usuario: " +
+              usuario +
+              "."
+
+            : "📴 Sin conexión. Lectura guardada en el teléfono. Usuario: " +
+              usuario +
+              "."
+
+      };
     }
-  }
 
 
-  // Libre -> ocupar.
-  hoja
-    .getRange(filaLugar, 5)
-    .setValue(usuario);
 
-  hoja
-    .getRange(filaLugar, 6)
-    .setValue(new Date(timestamp));
+    // =====================================================
+    // SINCRONIZAR
+    // =====================================================
 
+    async function sincronizarPendientes() {
 
-  const resultado = {
-    ok: true,
-    estado: "ocupado",
-    lugar: lugar,
-    usuario: usuario
-  };
+      if (
+        !navigator.onLine
+      ) {
 
-  finalizarLectura_(id, resultado);
-
-  return resultado;
-}
+        return;
+      }
 
 
-/* =====================================================
-   RESULTADOS
-   ===================================================== */
-
-function finalizarLectura_(
-  id,
-  resultado
-) {
-  if (!id) {
-    return;
-  }
-
-  guardarJSONPropiedad_(
-    "lectura_" + String(id).trim(),
-    resultado
-  );
-}
+      const pendientes =
+        obtenerPendientes();
 
 
-function finalizarLecturaSiExiste_(
-  id,
-  resultado
-) {
-  if (!id) {
-    return;
-  }
+      if (
+        pendientes.length === 0
+      ) {
 
-  finalizarLectura_(
-    id,
-    resultado
-  );
-}
+        return;
+      }
 
 
-function leerResultadoLectura_(id) {
-  if (!id) {
-    return null;
-  }
-
-  return leerJSONPropiedad_(
-    "lectura_" + String(id).trim()
-  );
-}
+      const restantes =
+        [];
 
 
-/* =====================================================
-   PROPIEDADES JSON
-   ===================================================== */
+      for (
+        const lectura of pendientes
+      ) {
 
-function guardarJSONPropiedad_(
-  clave,
-  objeto
-) {
-  PropertiesService
-    .getScriptProperties()
-    .setProperty(
-      clave,
-      JSON.stringify(objeto)
+        try {
+
+          // -----------------------------------------
+          // ENVIAR LECTURA
+          // -----------------------------------------
+
+          await fetch(
+            BACKEND_URL,
+            {
+              method:
+                "POST",
+
+              mode:
+                "no-cors",
+
+              headers: {
+
+                "Content-Type":
+                  "text/plain;charset=utf-8"
+
+              },
+
+              body:
+                JSON.stringify({
+
+                  clave:
+                    CLAVE_PWA,
+
+                  id:
+                    lectura.id,
+
+                  lugar:
+                    lectura.lugar,
+
+                  timestamp:
+                    lectura.timestamp,
+
+                  deviceToken:
+                    lectura.deviceToken
+
+                })
+            }
+          );
+
+
+          let resultado =
+            null;
+
+
+          // -----------------------------------------
+          // CONSULTAR RESULTADO REAL
+          // -----------------------------------------
+
+          for (
+            let intento = 0;
+            intento < 8;
+            intento++
+          ) {
+
+            await esperar(
+              700
+            );
+
+
+            const consulta =
+              BACKEND_URL +
+              "?accion=estado&id=" +
+              encodeURIComponent(
+                lectura.id
+              ) +
+              "&t=" +
+              Date.now();
+
+
+            const respuesta =
+              await fetch(
+                consulta,
+                {
+                  method:
+                    "GET",
+
+                  cache:
+                    "no-store"
+                }
+              );
+
+
+            const datos =
+              await respuesta.json();
+
+
+            if (
+              datos.estado &&
+              datos.estado !==
+                "pendiente"
+            ) {
+
+              resultado =
+                datos;
+
+              break;
+            }
+          }
+
+
+          // Servidor aún no respondió
+          if (!resultado) {
+
+            restantes.push(
+              lectura
+            );
+
+            continue;
+          }
+
+
+          // Mostrar resultado final
+          mostrarResultadoServidor(
+            resultado,
+            lectura
+          );
+
+
+        } catch (error) {
+
+          console.error(
+            "Error sincronizando:",
+            error
+          );
+
+
+          restantes.push(
+            lectura
+          );
+        }
+      }
+
+
+      guardarPendientes(
+        restantes
+      );
+
+
+      if (
+        restantes.length > 0
+      ) {
+
+        mostrarEstado(
+          "⏳ Hay " +
+          restantes.length +
+          " lectura(s) pendiente(s) de sincronizar."
+        );
+      }
+    }
+
+
+
+    // =====================================================
+    // RESULTADO DEL SERVIDOR
+    // =====================================================
+
+    function mostrarResultadoServidor(
+      resultado,
+      lectura
+    ) {
+
+      const usuario =
+        resultado.usuario ||
+        lectura.usuario ||
+        "Usuario";
+
+
+      switch (
+        resultado.estado
+      ) {
+
+
+        // -------------------------------------------
+        // OCUPADO
+        // -------------------------------------------
+
+        case "ocupado":
+
+          mostrarEstado(
+            "🚗 " +
+            lectura.lugar +
+            " quedó ocupado. Usuario: " +
+            usuario +
+            "."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // LIBERADO
+        // -------------------------------------------
+
+        case "liberado":
+
+          mostrarEstado(
+            "✅ " +
+            lectura.lugar +
+            " quedó Libre. Usuario: " +
+            usuario +
+            "."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // OCUPADO POR OTRA PERSONA
+        // -------------------------------------------
+
+        case "ocupado_por_otro":
+
+          mostrarEstado(
+            "⚠️ No se realizó el cambio. " +
+            lectura.lugar +
+            " está ocupado por " +
+            (
+              resultado.ocupante ||
+              "otra persona"
+            ) +
+            ". Usuario que leyó la tag: " +
+            usuario +
+            "."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // YA ESTACIONADO
+        // -------------------------------------------
+
+        case "usuario_en_otro_lugar":
+
+          mostrarEstado(
+            "⚠️ No se realizó el cambio. " +
+            usuario +
+            " ya está registrado en " +
+            (
+              resultado.lugarActual ||
+              "otro lugar"
+            ) +
+            "."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // LECTURA VIEJA
+        // -------------------------------------------
+
+        case "lectura_antigua":
+
+          mostrarEstado(
+            "⏭️ La lectura de " +
+            usuario +
+            " no se aplicó porque ya hubo un cambio más reciente."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // USUARIO ELIMINADO DE SHEETS
+        // -------------------------------------------
+
+        case "usuario_no_autorizado":
+
+          mostrarEstado(
+            "⛔ Esta cuenta ya no está autorizada para usar los cajones."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // DISPOSITIVO INVÁLIDO
+        // -------------------------------------------
+
+        case "dispositivo_no_autorizado":
+
+          /*
+          Solo llegamos aquí con una lectura NUEVA que sí
+          tenía deviceToken.
+
+          Las lecturas viejas sin deviceToken fueron
+          eliminadas previamente por obtenerPendientes().
+          */
+
+          limpiarSesionLocal();
+
+
+          localStorage.removeItem(
+            "ultimaLecturaNFC"
+          );
+
+
+          document
+            .getElementById(
+              "registroUsuario"
+            )
+            .style.display =
+              "block";
+
+
+          document
+            .getElementById(
+              "usuarioActual"
+            )
+            .style.display =
+              "none";
+
+
+          document
+            .getElementById(
+              "botonCambiarUsuario"
+            )
+            .style.display =
+              "none";
+
+
+          mostrarEstado(
+            "🔐 Este dispositivo necesita iniciar sesión nuevamente."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // LUGAR NO ENCONTRADO
+        // -------------------------------------------
+
+        case "lugar_no_encontrado":
+
+          mostrarEstado(
+            "❌ No se encontró el lugar " +
+            lectura.lugar +
+            "."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // TAG INVÁLIDA
+        // -------------------------------------------
+
+        case "lugar_no_valido":
+
+          mostrarEstado(
+            "❌ Tag NFC no válido."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // ERROR
+        // -------------------------------------------
+
+        case "error":
+
+          mostrarEstado(
+            "❌ Ocurrió un error al procesar la lectura."
+          );
+
+          break;
+
+
+        // -------------------------------------------
+        // OTRO
+        // -------------------------------------------
+
+        default:
+
+          mostrarEstado(
+            "ℹ️ Resultado: " +
+            resultado.estado
+          );
+      }
+    }
+
+
+
+    // =====================================================
+    // INICIAR PWA
+    // =====================================================
+
+    function iniciar() {
+
+      // Primero hacemos migración automática de
+      // lecturas antiguas.
+      obtenerPendientes();
+
+
+      const lugar =
+        obtenerLugar();
+
+
+      // ---------------------------------------------
+      // SIN SESIÓN
+      // ---------------------------------------------
+
+      if (
+        !sesionLista()
+      ) {
+
+        document
+          .getElementById(
+            "registroUsuario"
+          )
+          .style.display =
+            "block";
+
+
+        document
+          .getElementById(
+            "usuarioActual"
+          )
+          .style.display =
+            "none";
+
+
+        document
+          .getElementById(
+            "botonCambiarUsuario"
+          )
+          .style.display =
+            "none";
+
+
+        mostrarEstado(
+          "Inicia sesión con tu cuenta de Google."
+        );
+
+
+        return;
+      }
+
+
+      // ---------------------------------------------
+      // SESIÓN EXISTENTE
+      // ---------------------------------------------
+
+      mostrarSesion();
+
+
+      // ---------------------------------------------
+      // PWA ABIERTA SIN NFC
+      // ---------------------------------------------
+
+      if (!lugar) {
+
+        mostrarEstado(
+          navigator.onLine
+
+            ? "✅ Sesión lista. Usuario: " +
+              obtenerUsuarioValidado() +
+              "."
+
+            : "📴 Aplicación disponible sin conexión. Usuario: " +
+              obtenerUsuarioValidado() +
+              "."
+        );
+
+
+        sincronizarPendientes();
+
+
+        return;
+      }
+
+
+      // ---------------------------------------------
+      // LUGAR INVÁLIDO
+      // ---------------------------------------------
+
+      if (
+        ![
+          "Adelante",
+          "Medio",
+          "Atrás"
+        ].includes(
+          lugar
+        )
+      ) {
+
+        mostrarEstado(
+          "❌ Lugar NFC no válido."
+        );
+
+
+        return;
+      }
+
+
+      // ---------------------------------------------
+      // REGISTRAR ESCANEO
+      // ---------------------------------------------
+
+      const resultado =
+        guardarLectura(
+          lugar
+        );
+
+
+      mostrarEstado(
+        resultado.mensaje +
+        " Lugar: " +
+        lugar +
+        "."
+      );
+
+
+      if (
+        resultado.aceptada
+      ) {
+
+        sincronizarPendientes();
+      }
+    }
+
+
+
+    // =====================================================
+    // RECUPERAR INTERNET
+    // =====================================================
+
+    window.addEventListener(
+      "online",
+      () => {
+
+        mostrarEstado(
+          "📶 Conexión recuperada. Sincronizando..."
+        );
+
+
+        sincronizarPendientes();
+      }
     );
-}
 
 
-function leerJSONPropiedad_(clave) {
-  const valor =
-    PropertiesService
-      .getScriptProperties()
-      .getProperty(clave);
 
-  if (!valor) {
-    return null;
-  }
+    // =====================================================
+    // UTILIDADES
+    // =====================================================
 
-  try {
-    return JSON.parse(valor);
+    function mostrarEstado(
+      mensaje
+    ) {
 
-  } catch (error) {
-    // Compatibilidad con resultados viejos
-    // que estaban guardados como texto.
-    return {
-      ok: true,
-      estado: valor
-    };
-  }
-}
+      document
+        .getElementById(
+          "estado"
+        )
+        .textContent =
+          mensaje;
+    }
 
 
-/* =====================================================
-   ACTIVO
-   ===================================================== */
+    function esperar(ms) {
 
-function esActivo_(valor) {
-  if (valor === true) {
-    return true;
-  }
-
-  const texto =
-    normalizarTexto_(valor);
-
-  return [
-    "true",
-    "si",
-    "1",
-    "activo"
-  ].includes(texto);
-}
+      return new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            ms
+          )
+      );
+    }
 
 
-/* =====================================================
-   NORMALIZAR
-   ===================================================== */
 
-function normalizarTexto_(valor) {
-  return String(valor || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(
-      /[\u0300-\u036f]/g,
-      ""
-    );
-}
+    // =====================================================
+    // ARRANQUE
+    // =====================================================
+
+    iniciar();
 
 
-/* =====================================================
-   JSON
-   ===================================================== */
 
-function respuestaJSON_(objeto) {
-  return ContentService
-    .createTextOutput(
-      JSON.stringify(objeto)
-    )
-    .setMimeType(
-      ContentService.MimeType.JSON
-    );
-}
+    // =====================================================
+    // SERVICE WORKER
+    // =====================================================
+
+    if (
+      "serviceWorker" in navigator
+    ) {
+
+      navigator
+        .serviceWorker
+        .register(
+          "./service-worker.js"
+        )
+        .catch(
+          error => {
+
+            console.error(
+              "Error registrando Service Worker:",
+              error
+            );
+
+          }
+        );
+    }
+
+  </script>
+
+</body>
+
+</html>
