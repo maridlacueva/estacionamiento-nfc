@@ -6,24 +6,35 @@
 
   <title>Estacionamiento NFC</title>
   <link rel="manifest" href="./manifest.json">
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+  
 </head>
 
 <body>
   <h1>🚗 Estacionamiento NFC</h1>
 
-  <div id="registroUsuario">
-    <p>Selecciona quién usa este teléfono:</p>
+<div id="registroUsuario">
+  <p>Inicia sesión con tu cuenta de Google:</p>
 
-    <select id="usuario">
-      <option value="">Selecciona...</option>
-      <option value="Felipe">Felipe</option>
-      <option value="Vany">Vany</option>
-      <option value="Mariana">Mariana</option>
-    </select>
-
-    <button onclick="guardarUsuario()">Guardar</button>
+  <div
+    id="g_id_onload"
+    data-client_id="979392516075-ch3kg5n5fdbf9uco2ts2csr4motjfuqi.apps.googleusercontent.com"
+    data-callback="manejarGoogleLogin"
+    data-auto_prompt="false">
   </div>
 
+  <div
+    class="g_id_signin"
+    data-type="standard"
+    data-size="large"
+    data-theme="outline"
+    data-text="signin_with"
+    data-shape="rectangular"
+    data-logo_alignment="left">
+  </div>
+</div>
+  
   <p id="estado">Procesando...</p>
 
   <button onclick="cambiarUsuario()" style="margin-top:20px;">
