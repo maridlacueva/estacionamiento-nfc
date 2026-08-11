@@ -60,17 +60,7 @@
 
 
   <!-- ===================================================
-       USUARIO AUTORIZADO
-       =================================================== -->
-
-  <p
-    id="usuarioActual"
-    style="display:none;">
-  </p>
-
-
-  <!-- ===================================================
-       ESTADO
+       ESTADO PRINCIPAL
        =================================================== -->
 
   <p
@@ -95,6 +85,21 @@
   </button>
 
 
+  <!-- ===================================================
+       CORREO ACTUAL - AL FINAL
+       =================================================== -->
+
+  <p
+    id="correoActual"
+    style="
+      display:none;
+      margin-top:25px;
+      font-size:13px;
+      opacity:0.7;
+    ">
+  </p>
+
+
 
   <script>
 
@@ -102,8 +107,7 @@
     // CONFIGURACIÓN
     // =====================================================
 
-    const ANTIREBOTE_MS =
-      30000;
+    const ANTIREBOTE_MS = 30000;
 
 
     const BACKEND_URL =
@@ -327,7 +331,7 @@
         }
 
 
-        // Guardar identidad validada
+        // Guardar identidad validada.
 
         localStorage.setItem(
           "correoGoogle",
@@ -399,7 +403,7 @@
 
       document
         .getElementById(
-          "usuarioActual"
+          "correoActual"
         )
         .style.display =
           "none";
@@ -448,7 +452,7 @@
 
 
     // =====================================================
-    // MOSTRAR USUARIO
+    // MOSTRAR SESIÓN
     // =====================================================
 
     function mostrarSesion() {
@@ -480,7 +484,7 @@
 
       document
         .getElementById(
-          "usuarioActual"
+          "correoActual"
         )
         .style.display =
           "block";
@@ -488,12 +492,10 @@
 
       document
         .getElementById(
-          "usuarioActual"
+          "correoActual"
         )
         .textContent =
-          "Usuario: " +
-          usuario +
-          " · " +
+          "Correo: " +
           correo;
 
 
@@ -666,7 +668,7 @@
 
           mensaje:
             "⏳ Segunda lectura ignorada.\n" +
-            "Espera 30 segundos antes de volver a usar este mismo NFC.\n" +
+            "Espera 30 segundos antes de volver a usar este mismo NFC.\n\n" +
             "Usuario: " +
             usuario +
             "\nLugar: " +
@@ -744,7 +746,7 @@
             true,
 
           mensaje:
-            "⏳ Esperando confirmación...\n" +
+            "⏳ Esperando confirmación...\n\n" +
             "Usuario: " +
             usuario +
             "\nLugar: " +
@@ -762,7 +764,7 @@
 
         mensaje:
           "📴 Sin conexión a internet.\n" +
-          "El movimiento quedó guardado en este teléfono y se enviará cuando vuelva la conexión.\n" +
+          "El movimiento quedó guardado en este teléfono y se enviará cuando vuelva la conexión.\n\n" +
           "Usuario: " +
           usuario +
           "\nLugar: " +
@@ -809,11 +811,8 @@
 
         try {
 
-          // Si existe una operación pendiente,
-          // informamos claramente qué estamos haciendo.
-
           mostrarEstado(
-            "🔄 Sincronizando con el estacionamiento...\n" +
+            "🔄 Sincronizando con el estacionamiento...\n\n" +
             "Usuario: " +
             lectura.usuario +
             "\nLugar: " +
@@ -863,8 +862,6 @@
           let resultado =
             null;
 
-
-          // Consultar resultado real
 
           for (
             let intento = 0;
@@ -918,8 +915,6 @@
           }
 
 
-          // Servidor aún no confirmó
-
           if (!resultado) {
 
             restantes.push(
@@ -929,8 +924,6 @@
             continue;
           }
 
-
-          // Resultado confirmado
 
           mostrarResultadoServidor(
             resultado,
@@ -1127,7 +1120,7 @@
 
           document
             .getElementById(
-              "usuarioActual"
+              "correoActual"
             )
             .style.display =
               "none";
@@ -1211,7 +1204,7 @@
 
     function iniciar() {
 
-      // Limpiar automáticamente lecturas antiguas
+      // Limpiar automáticamente lecturas antiguas.
       obtenerPendientes();
 
 
@@ -1237,7 +1230,7 @@
 
         document
           .getElementById(
-            "usuarioActual"
+            "correoActual"
           )
           .style.display =
             "none";
@@ -1280,7 +1273,7 @@
               obtenerUsuarioValidado()
 
             : "📴 Sistema disponible sin conexión.\n" +
-              "Los movimientos se guardarán en este teléfono hasta recuperar internet.\n" +
+              "Los movimientos se guardarán en este teléfono hasta recuperar internet.\n\n" +
               "Usuario: " +
               obtenerUsuarioValidado()
         );
@@ -1358,7 +1351,8 @@
         ) {
 
           mostrarEstado(
-            "📶 Conexión recuperada.\nSincronizando " +
+            "📶 Conexión recuperada.\n" +
+            "Sincronizando " +
             pendientes.length +
             " movimiento(s) pendiente(s)..."
           );
@@ -1369,7 +1363,9 @@
         } else {
 
           mostrarEstado(
-            "📶 Conexión recuperada.\nSistema listo.\nUsuario: " +
+            "📶 Conexión recuperada.\n" +
+            "Sistema listo.\n" +
+            "Usuario: " +
             obtenerUsuarioValidado()
           );
         }
