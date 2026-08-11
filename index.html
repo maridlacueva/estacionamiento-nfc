@@ -29,30 +29,60 @@
   <script>
     const ANTIREBOTE_MS = 30000;
 
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbyeLqJYUdKviFeCTLscWYk05RrDX6Z3lsXA0U6BbAz_j1S0GD0t6ch0KX-utOuHg5I1/exec";
+
+    const CLAVE_PWA =
+      "ESTACIONAMIENTO_NFC_2026_PWA";
+
+
     function obtenerLugar() {
       const params = new URLSearchParams(window.location.search);
       return params.get("lugar");
     }
 
+
     function obtenerUsuario() {
       return localStorage.getItem("usuarioEstacionamiento");
     }
 
+
     function guardarUsuario() {
-      const selector = document.getElementById("usuario");
-      const usuario = selector.value;
+      const usuario =
+        document.getElementById("usuario").value;
 
       if (!usuario) {
         alert("Selecciona un usuario.");
         return;
       }
 
-      localStorage.setItem("usuarioEstacionamiento", usuario);
+      localStorage.setItem(
+        "usuarioEstacionamiento",
+        usuario
+      );
 
-      document.getElementById("registroUsuario").style.display = "none";
+      document.getElementById(
+        "registroUsuario"
+      ).style.display = "none";
 
       iniciar();
     }
+
+
+    function obtenerPendientes() {
+      return JSON.parse(
+        localStorage.getItem("lecturasPendientes") || "[]"
+      );
+    }
+
+
+    function guardarPendientes(pendientes) {
+      localStorage.setItem(
+        "lecturasPendientes",
+        JSON.stringify(pendientes)
+      );
+    }
+
 
     function guardarLectura(lugar, usuario) {
       const ahora = Date.now();
@@ -77,20 +107,14 @@
         id: crypto.randomUUID(),
         lugar: lugar,
         usuario: usuario,
-        timestamp: ahora,
-        sincronizado: false
+        timestamp: ahora
       };
 
-      const pendientes = JSON.parse(
-        localStorage.getItem("lecturasPendientes") || "[]"
-      );
+      const pendientes = obtenerPendientes();
 
       pendientes.push(lectura);
 
-      localStorage.setItem(
-        "lecturasPendientes",
-        JSON.stringify(pendientes)
-      );
+      guardarPendientes(pendientes);
 
       localStorage.setItem(
         "ultimaLecturaNFC",
@@ -104,33 +128,92 @@
       return {
         aceptada: true,
         mensaje: navigator.onLine
-          ? "✅ Lectura registrada. Pendiente de sincronización."
+          ? "✅ Lectura registrada."
           : "📴 Sin conexión. Lectura guardada en el teléfono."
       };
     }
 
+
+    async function sincronizarPendientes() {
+      if (!navigator.onLine) {
+        return;
+      }
+
+      let pendientes = obtenerPendientes();
+
+      if (pendientes.length === 0) {
+        return;
+      }
+
+      const restantes = [];
+
+      for (const lectura of pendientes) {
+        try {
+          await fetch(BACKEND_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              clave: CLAVE_PWA,
+              id: lectura.id,
+              lugar: lectura.lugar,
+              usuario: lectura.usuario,
+              timestamp: lectura.timestamp
+            })
+          });
+
+        } catch (error) {
+          restantes.push(lectura);
+        }
+      }
+
+      guardarPendientes(restantes);
+
+      if (restantes.length === 0) {
+        document.getElementById("estado").textContent =
+          "✅ Todo sincronizado correctamente.";
+      }
+    }
+
+
     function iniciar() {
       const lugar = obtenerLugar();
       const usuario = obtenerUsuario();
-      const estado = document.getElementById("estado");
+      const estado =
+        document.getElementById("estado");
 
       if (!usuario) {
-        estado.textContent = "Primero registra este teléfono.";
-        document.getElementById("registroUsuario").style.display = "block";
+        estado.textContent =
+          "Primero registra este teléfono.";
+
+        document.getElementById(
+          "registroUsuario"
+        ).style.display = "block";
+
         return;
       }
 
       if (!lugar) {
-        estado.textContent = "❌ No se recibió ningún lugar.";
+        estado.textContent =
+          "❌ No se recibió ningún lugar.";
+
+        sincronizarPendientes();
         return;
       }
 
-      if (!["Adelante", "Medio", "Atrás"].includes(lugar)) {
-        estado.textContent = "❌ Lugar NFC no válido.";
+      if (
+        !["Adelante", "Medio", "Atrás"].includes(lugar)
+      ) {
+        estado.textContent =
+          "❌ Lugar NFC no válido.";
+
         return;
       }
 
-      const resultado = guardarLectura(lugar, usuario);
+      const resultado =
+        guardarLectura(lugar, usuario);
 
       estado.textContent =
         resultado.mensaje +
@@ -138,14 +221,31 @@
         usuario +
         ". Lugar: " +
         lugar;
+
+      if (resultado.aceptada) {
+        sincronizarPendientes();
+      }
     }
+
+
+    window.addEventListener("online", () => {
+      document.getElementById("estado").textContent =
+        "📶 Conexión recuperada. Sincronizando...";
+
+      sincronizarPendientes();
+    });
+
 
     iniciar();
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js")
+      navigator.serviceWorker
+        .register("./service-worker.js")
         .catch(error => {
-          console.error("Error registrando Service Worker:", error);
+          console.error(
+            "Error registrando Service Worker:",
+            error
+          );
         });
     }
   </script>
