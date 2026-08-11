@@ -10,7 +10,21 @@
 
 <body>
   <h1>🚗 Estacionamiento NFC</h1>
-  <p id="estado">Procesando lectura...</p>
+
+  <div id="registroUsuario" style="display:none;">
+    <p>Selecciona quién usa este teléfono:</p>
+
+    <select id="usuario">
+      <option value="">Selecciona...</option>
+      <option value="Felipe">Felipe</option>
+      <option value="Vany">Vany</option>
+      <option value="Mariana">Mariana</option>
+    </select>
+
+    <button onclick="guardarUsuario()">Guardar</button>
+  </div>
+
+  <p id="estado">Procesando...</p>
 
   <script>
     const ANTIREBOTE_MS = 30000;
@@ -20,7 +34,27 @@
       return params.get("lugar");
     }
 
-    function guardarLectura(lugar) {
+    function obtenerUsuario() {
+      return localStorage.getItem("usuarioEstacionamiento");
+    }
+
+    function guardarUsuario() {
+      const selector = document.getElementById("usuario");
+      const usuario = selector.value;
+
+      if (!usuario) {
+        alert("Selecciona un usuario.");
+        return;
+      }
+
+      localStorage.setItem("usuarioEstacionamiento", usuario);
+
+      document.getElementById("registroUsuario").style.display = "none";
+
+      iniciar();
+    }
+
+    function guardarLectura(lugar, usuario) {
       const ahora = Date.now();
 
       const ultimaLectura = JSON.parse(
@@ -30,6 +64,7 @@
       if (
         ultimaLectura &&
         ultimaLectura.lugar === lugar &&
+        ultimaLectura.usuario === usuario &&
         ahora - ultimaLectura.timestamp < ANTIREBOTE_MS
       ) {
         return {
@@ -41,6 +76,7 @@
       const lectura = {
         id: crypto.randomUUID(),
         lugar: lugar,
+        usuario: usuario,
         timestamp: ahora,
         sincronizado: false
       };
@@ -60,6 +96,7 @@
         "ultimaLecturaNFC",
         JSON.stringify({
           lugar: lugar,
+          usuario: usuario,
           timestamp: ahora
         })
       );
@@ -74,7 +111,14 @@
 
     function iniciar() {
       const lugar = obtenerLugar();
+      const usuario = obtenerUsuario();
       const estado = document.getElementById("estado");
+
+      if (!usuario) {
+        estado.textContent = "Primero registra este teléfono.";
+        document.getElementById("registroUsuario").style.display = "block";
+        return;
+      }
 
       if (!lugar) {
         estado.textContent = "❌ No se recibió ningún lugar.";
@@ -86,10 +130,14 @@
         return;
       }
 
-      const resultado = guardarLectura(lugar);
+      const resultado = guardarLectura(lugar, usuario);
 
       estado.textContent =
-        resultado.mensaje + " Lugar: " + lugar;
+        resultado.mensaje +
+        " Usuario: " +
+        usuario +
+        ". Lugar: " +
+        lugar;
     }
 
     iniciar();
