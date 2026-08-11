@@ -1,0 +1,9 @@
+{
+  "name": "Estacionamiento NFC",
+  "short_name": "Estacionamiento",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "Registro NFC del estacionamiento"
+}
