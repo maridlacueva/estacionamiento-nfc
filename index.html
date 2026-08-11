@@ -73,9 +73,9 @@
        ESTADO
        =================================================== -->
 
-  <p id="estado">
-    Procesando...
-  </p>
+ <p id="estado" style="white-space: pre-line;">
+  Procesando...
+</p>
 
 
   <!-- ===================================================
@@ -984,32 +984,30 @@
 
         case "ocupado":
 
-          mostrarEstado(
-            "🚗 " +
-            lectura.lugar +
-            " quedó ocupado. Usuario: " +
-            usuario +
-            "."
-          );
+  mostrarEstado(
+    "🚗 " +
+    lectura.lugar +
+    " quedó ocupado.\n" +
+    "Usuario: " +
+    usuario +
+    "."
+  );
 
-          break;
+  break;
 
 
-        // -------------------------------------------
-        // LIBERADO
-        // -------------------------------------------
+case "liberado":
 
-        case "liberado":
+  mostrarEstado(
+    "✅ " +
+    lectura.lugar +
+    " quedó Libre.\n" +
+    "Usuario: " +
+    usuario +
+    "."
+  );
 
-          mostrarEstado(
-            "✅ " +
-            lectura.lugar +
-            " quedó Libre. Usuario: " +
-            usuario +
-            "."
-          );
-
-          break;
+  break;
 
 
         // -------------------------------------------
