@@ -25,6 +25,9 @@
   </div>
 
   <p id="estado">Procesando...</p>
+  <button onclick="cambiarUsuario()" style="margin-top:20px;">
+  Cambiar usuario
+</button>
 
   <script>
     const ANTIREBOTE_MS = 30000;
@@ -65,6 +68,15 @@
         "registroUsuario"
       ).style.display = "none";
 
+function cambiarUsuario() {
+  localStorage.removeItem("usuarioEstacionamiento");
+  localStorage.removeItem("ultimaLecturaNFC");
+
+  document.getElementById("registroUsuario").style.display = "block";
+  document.getElementById("estado").textContent =
+    "Selecciona nuevamente quién usa este teléfono.";
+}
+      
       iniciar();
     }
 
