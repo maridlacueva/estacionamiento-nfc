@@ -5,20 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Estacionamiento NFC</title>
-
   <link rel="manifest" href="./manifest.json">
 </head>
 
 <body>
   <h1>🚗 Estacionamiento NFC</h1>
-  <p>PWA funcionando correctamente.</p>
+  <p id="estado">Procesando lectura...</p>
 
   <script>
+    const ANTIREBOTE_MS = 30000;
+
+    function obtenerLugar() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("lugar");
+    }
+
+    function guardarLectura(lugar) {
+      const ahora = Date.now();
+
+      const ultimaLectura = JSON.parse(
+        localStorage.getItem("ultimaLecturaNFC") || "null"
+      );
+
+      if (
+        ultimaLectura &&
+        ultimaLectura.lugar === lugar &&
+        ahora - ultimaLectura.timestamp < ANTIREBOTE_MS
+      ) {
+        return {
+          aceptada: false,
+          mensaje: "⏳ Lectura duplicada ignorada."
+        };
+      }
+
+      const lectura = {
+        id: crypto.randomUUID(),
+        lugar: lugar,
+        timestamp: ahora,
+        sincronizado: false
+      };
+
+      const pendientes = JSON.parse(
+        localStorage.getItem("lecturasPendientes") || "[]"
+      );
+
+      pendientes.push(lectura);
+
+      localStorage.setItem(
+        "lecturasPendientes",
+        JSON.stringify(pendientes)
+      );
+
+      localStorage.setItem(
+        "ultimaLecturaNFC",
+        JSON.stringify({
+          lugar: lugar,
+          timestamp: ahora
+        })
+      );
+
+      return {
+        aceptada: true,
+        mensaje: navigator.onLine
+          ? "✅ Lectura registrada. Pendiente de sincronización."
+          : "📴 Sin conexión. Lectura guardada en el teléfono."
+      };
+    }
+
+    function iniciar() {
+      const lugar = obtenerLugar();
+      const estado = document.getElementById("estado");
+
+      if (!lugar) {
+        estado.textContent = "❌ No se recibió ningún lugar.";
+        return;
+      }
+
+      if (!["Adelante", "Medio", "Atrás"].includes(lugar)) {
+        estado.textContent = "❌ Lugar NFC no válido.";
+        return;
+      }
+
+      const resultado = guardarLectura(lugar);
+
+      estado.textContent =
+        resultado.mensaje + " Lugar: " + lugar;
+    }
+
+    iniciar();
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("./service-worker.js")
-        .then(() => {
-          console.log("Service Worker registrado");
-        })
         .catch(error => {
           console.error("Error registrando Service Worker:", error);
         });
