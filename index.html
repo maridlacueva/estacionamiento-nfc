@@ -25,9 +25,10 @@
   </div>
 
   <p id="estado">Procesando...</p>
+
   <button onclick="cambiarUsuario()" style="margin-top:20px;">
-  Cambiar usuario
-</button>
+    Cambiar usuario
+  </button>
 
   <script>
     const ANTIREBOTE_MS = 30000;
@@ -51,8 +52,7 @@
 
 
     function guardarUsuario() {
-      const usuario =
-        document.getElementById("usuario").value;
+      const usuario = document.getElementById("usuario").value;
 
       if (!usuario) {
         alert("Selecciona un usuario.");
@@ -64,24 +64,25 @@
         usuario
       );
 
-      document.getElementById(
-        "registroUsuario"
-      ).style.display = "none";
+      document.getElementById("registroUsuario").style.display = "none";
 
-function cambiarUsuario() {
-  localStorage.removeItem("usuarioEstacionamiento");
-  localStorage.removeItem("ultimaLecturaNFC");
-
-  const registro = document.getElementById("registroUsuario");
-  const estado = document.getElementById("estado");
-
-  registro.style.display = "block";
-  estado.textContent = "Selecciona nuevamente quién usa este teléfono.";
-
-  document.getElementById("usuario").value = "";
-}
-      
       iniciar();
+    }
+
+
+    function cambiarUsuario() {
+      localStorage.removeItem("usuarioEstacionamiento");
+      localStorage.removeItem("ultimaLecturaNFC");
+
+      const registro = document.getElementById("registroUsuario");
+      const estado = document.getElementById("estado");
+
+      document.getElementById("usuario").value = "";
+
+      registro.style.display = "block";
+
+      estado.textContent =
+        "Selecciona nuevamente quién usa este teléfono.";
     }
 
 
@@ -155,7 +156,7 @@ function cambiarUsuario() {
         return;
       }
 
-      let pendientes = obtenerPendientes();
+      const pendientes = obtenerPendientes();
 
       if (pendientes.length === 0) {
         return;
@@ -197,24 +198,16 @@ function cambiarUsuario() {
     function iniciar() {
       const lugar = obtenerLugar();
       const usuario = obtenerUsuario();
-      const estado =
-        document.getElementById("estado");
+      const estado = document.getElementById("estado");
+      const registro = document.getElementById("registroUsuario");
 
-const registro = document.getElementById("registroUsuario");
+      if (usuario) {
+        registro.style.display = "none";
+      } else {
+        registro.style.display = "block";
 
-if (usuario) {
-  registro.style.display = "none";
-} else {
-  registro.style.display = "block";
-}
-      
-      if (!usuario) {
         estado.textContent =
           "Primero registra este teléfono.";
-
-        document.getElementById(
-          "registroUsuario"
-        ).style.display = "block";
 
         return;
       }
@@ -227,9 +220,7 @@ if (usuario) {
         return;
       }
 
-      if (
-        !["Adelante", "Medio", "Atrás"].includes(lugar)
-      ) {
+      if (!["Adelante", "Medio", "Atrás"].includes(lugar)) {
         estado.textContent =
           "❌ Lugar NFC no válido.";
 
@@ -261,6 +252,7 @@ if (usuario) {
 
 
     iniciar();
+
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
