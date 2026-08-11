@@ -460,21 +460,24 @@
       switch (estadoServidor) {
 
         case "ocupado":
-          mostrarEstado(
-            "🚗 " +
-            lectura.lugar +
-            " quedó ocupado correctamente."
-          );
-          break;
+  mostrarEstado(
+    "🚗 " +
+    lectura.lugar +
+    " quedó ocupado correctamente. Usuario: " +
+    (lectura.usuarioValidado || "autorizado") +
+    "."
+  );
+  break;
 
-
-        case "liberado":
-          mostrarEstado(
-            "✅ " +
-            lectura.lugar +
-            " quedó Libre."
-          );
-          break;
+case "liberado":
+  mostrarEstado(
+    "✅ " +
+    lectura.lugar +
+    " quedó Libre. Usuario: " +
+    (lectura.usuarioValidado || "autorizado") +
+    "."
+  );
+  break;
 
 
         case "ocupado_por_otro":
