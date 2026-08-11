@@ -72,9 +72,16 @@ function cambiarUsuario() {
   localStorage.removeItem("usuarioEstacionamiento");
   localStorage.removeItem("ultimaLecturaNFC");
 
-  document.getElementById("registroUsuario").style.display = "block";
+  const registro = document.getElementById("registroUsuario");
+  registro.style.display = "block";
+
   document.getElementById("estado").textContent =
     "Selecciona nuevamente quién usa este teléfono.";
+
+  registro.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
 }
       
       iniciar();
