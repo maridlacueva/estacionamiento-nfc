@@ -73,9 +73,11 @@
        ESTADO
        =================================================== -->
 
- <p id="estado" style="white-space: pre-line;">
-  Procesando...
-</p>
+  <p
+    id="estado"
+    style="white-space: pre-line;">
+    Preparando...
+  </p>
 
 
   <!-- ===================================================
@@ -177,7 +179,7 @@
       try {
 
         mostrarEstado(
-          "🔐 Validando tu cuenta..."
+          "🔐 Verificando tu cuenta con Google..."
         );
 
 
@@ -185,7 +187,6 @@
           crypto.randomUUID();
 
 
-        // Enviar token firmado de Google a Apps Script
         await fetch(
           BACKEND_URL,
           {
@@ -221,7 +222,6 @@
           null;
 
 
-        // Consultar hasta que Apps Script termine
         for (
           let intento = 0;
           intento < 8;
@@ -270,18 +270,16 @@
         }
 
 
-        // No hubo respuesta definitiva
         if (!resultado) {
 
           mostrarEstado(
-            "⏳ No se pudo terminar la validación. Intenta nuevamente."
+            "⏳ No recibimos confirmación todavía.\nIntenta iniciar sesión nuevamente."
           );
 
           return;
         }
 
 
-        // Cuenta no autorizada
         if (
           resultado.estado ===
           "usuario_no_autorizado"
@@ -290,14 +288,13 @@
           limpiarSesionLocal();
 
           mostrarEstado(
-            "⛔ Esta cuenta de Google no está autorizada para usar estos cajones."
+            "⛔ Cuenta no autorizada.\nEste correo no está registrado para usar el estacionamiento."
           );
 
           return;
         }
 
 
-        // Token de Google inválido
         if (
           resultado.estado ===
           "token_google_invalido"
@@ -306,14 +303,13 @@
           limpiarSesionLocal();
 
           mostrarEstado(
-            "🔐 No se pudo validar la cuenta de Google. Intenta iniciar sesión nuevamente."
+            "🔐 No pudimos validar la sesión de Google.\nIntenta iniciar sesión nuevamente."
           );
 
           return;
         }
 
 
-        // Cualquier otro error
         if (
           !resultado.ok ||
           resultado.estado !== "autorizado" ||
@@ -324,15 +320,14 @@
           limpiarSesionLocal();
 
           mostrarEstado(
-            "❌ No se pudo autorizar este dispositivo."
+            "❌ No fue posible autorizar este dispositivo.\nIntenta nuevamente."
           );
 
           return;
         }
 
 
-        // Guardar únicamente identidad ya validada
-        // por Google + Apps Script + hoja Usuarios
+        // Guardar identidad validada
 
         localStorage.setItem(
           "correoGoogle",
@@ -356,14 +351,11 @@
 
 
         mostrarEstado(
-          "✅ Acceso autorizado. Usuario: " +
-          resultado.usuario +
-          "."
+          "✅ Cuenta autorizada.\nUsuario: " +
+          resultado.usuario
         );
 
 
-        // Si el login ocurrió después de escanear una tag,
-        // continuar automáticamente.
         iniciar();
 
 
@@ -376,7 +368,7 @@
 
 
         mostrarEstado(
-          "❌ No se pudo validar la cuenta. Revisa tu conexión."
+          "❌ No pudimos verificar tu cuenta.\nRevisa tu conexión a internet e intenta nuevamente."
         );
       }
     }
@@ -422,7 +414,7 @@
 
 
       mostrarEstado(
-        "Inicia sesión nuevamente con Google."
+        "🔐 Selecciona la cuenta de Google que utilizará este teléfono."
       );
 
 
@@ -531,15 +523,8 @@
           );
 
 
-        /*
-        IMPORTANTE:
-
-        Elimina automáticamente lecturas antiguas creadas
-        antes de que existiera el sistema deviceToken.
-
-        Así una lectura vieja no puede provocar después:
-        "dispositivo no autorizado".
-        */
+        // Eliminar lecturas antiguas de versiones previas
+        // que no tienen deviceToken.
 
         const validas =
           pendientes.filter(
@@ -628,7 +613,7 @@
             false,
 
           mensaje:
-            "🔐 Primero inicia sesión con una cuenta autorizada."
+            "🔐 Inicia sesión con una cuenta autorizada antes de usar el NFC."
 
         };
       }
@@ -659,9 +644,9 @@
       }
 
 
-      // ---------------------------------------------
+      // =================================================
       // ANTI-REBOTE 30 SEGUNDOS
-      // ---------------------------------------------
+      // =================================================
 
       if (
         ultimaLectura &&
@@ -680,17 +665,20 @@
             false,
 
           mensaje:
-            "⏳ Lectura duplicada ignorada. Usuario: " +
+            "⏳ Segunda lectura ignorada.\n" +
+            "Espera 30 segundos antes de volver a usar este mismo NFC.\n" +
+            "Usuario: " +
             usuario +
-            "."
+            "\nLugar: " +
+            lugar
 
         };
       }
 
 
-      // ---------------------------------------------
+      // =================================================
       // CREAR LECTURA
-      // ---------------------------------------------
+      // =================================================
 
       const lectura = {
 
@@ -746,21 +734,39 @@
       );
 
 
+      if (
+        navigator.onLine
+      ) {
+
+        return {
+
+          aceptada:
+            true,
+
+          mensaje:
+            "⏳ Esperando confirmación...\n" +
+            "Usuario: " +
+            usuario +
+            "\nLugar: " +
+            lugar
+
+        };
+
+      }
+
+
       return {
 
         aceptada:
           true,
 
         mensaje:
-          navigator.onLine
-
-            ? "✅ Lectura registrada. Usuario: " +
-              usuario +
-              "."
-
-            : "📴 Sin conexión. Lectura guardada en el teléfono. Usuario: " +
-              usuario +
-              "."
+          "📴 Sin conexión a internet.\n" +
+          "El movimiento quedó guardado en este teléfono y se enviará cuando vuelva la conexión.\n" +
+          "Usuario: " +
+          usuario +
+          "\nLugar: " +
+          lugar
 
       };
     }
@@ -803,9 +809,17 @@
 
         try {
 
-          // -----------------------------------------
-          // ENVIAR LECTURA
-          // -----------------------------------------
+          // Si existe una operación pendiente,
+          // informamos claramente qué estamos haciendo.
+
+          mostrarEstado(
+            "🔄 Sincronizando con el estacionamiento...\n" +
+            "Usuario: " +
+            lectura.usuario +
+            "\nLugar: " +
+            lectura.lugar
+          );
+
 
           await fetch(
             BACKEND_URL,
@@ -850,9 +864,7 @@
             null;
 
 
-          // -----------------------------------------
-          // CONSULTAR RESULTADO REAL
-          // -----------------------------------------
+          // Consultar resultado real
 
           for (
             let intento = 0;
@@ -906,7 +918,8 @@
           }
 
 
-          // Servidor aún no respondió
+          // Servidor aún no confirmó
+
           if (!resultado) {
 
             restantes.push(
@@ -917,7 +930,8 @@
           }
 
 
-          // Mostrar resultado final
+          // Resultado confirmado
+
           mostrarResultadoServidor(
             resultado,
             lectura
@@ -949,9 +963,10 @@
       ) {
 
         mostrarEstado(
-          "⏳ Hay " +
+          "📴 No pudimos confirmar " +
           restantes.length +
-          " lectura(s) pendiente(s) de sincronizar."
+          " movimiento(s).\n" +
+          "Quedaron guardados y volveremos a intentarlo cuando haya conexión."
         );
       }
     }
@@ -959,7 +974,7 @@
 
 
     // =====================================================
-    // RESULTADO DEL SERVIDOR
+    // RESULTADO CONFIRMADO POR EL SERVIDOR
     // =====================================================
 
     function mostrarResultadoServidor(
@@ -978,68 +993,72 @@
       ) {
 
 
-        // -------------------------------------------
-        // OCUPADO
-        // -------------------------------------------
+        // =================================================
+        // OCUPAR
+        // =================================================
 
         case "ocupado":
 
-  mostrarEstado(
-    "🚗 " +
-    lectura.lugar +
-    " quedó ocupado.\n" +
-    "Usuario: " +
-    usuario +
-    "."
-  );
-
-  break;
-
-
-case "liberado":
-
-  mostrarEstado(
-    "✅ " +
-    lectura.lugar +
-    " quedó Libre.\n" +
-    "Usuario: " +
-    usuario +
-    "."
-  );
-
-  break;
-
-
-        // -------------------------------------------
-        // OCUPADO POR OTRA PERSONA
-        // -------------------------------------------
-
-        case "ocupado_por_otro":
-
           mostrarEstado(
-            "⚠️ No se realizó el cambio. " +
+            "✅ Movimiento confirmado.\n\n" +
+            "🚗 " +
             lectura.lugar +
-            " está ocupado por " +
-            (
-              resultado.ocupante ||
-              "otra persona"
-            ) +
-            ". Usuario que leyó la tag: " +
-            usuario +
-            "."
+            " quedó ocupado.\n" +
+            "Usuario: " +
+            usuario
           );
 
           break;
 
 
-        // -------------------------------------------
-        // YA ESTACIONADO
-        // -------------------------------------------
+        // =================================================
+        // LIBERAR
+        // =================================================
+
+        case "liberado":
+
+          mostrarEstado(
+            "✅ Movimiento confirmado.\n\n" +
+            "🅿️ " +
+            lectura.lugar +
+            " quedó Libre.\n" +
+            "Usuario: " +
+            usuario
+          );
+
+          break;
+
+
+        // =================================================
+        // OCUPADO POR OTRA PERSONA
+        // =================================================
+
+        case "ocupado_por_otro":
+
+          mostrarEstado(
+            "⚠️ No se hizo ningún cambio.\n\n" +
+            lectura.lugar +
+            " ya está ocupado por " +
+            (
+              resultado.ocupante ||
+              "otra persona"
+            ) +
+            ".\n" +
+            "Usuario que intentó registrar: " +
+            usuario
+          );
+
+          break;
+
+
+        // =================================================
+        // USUARIO YA EN OTRO LUGAR
+        // =================================================
 
         case "usuario_en_otro_lugar":
 
           mostrarEstado(
-            "⚠️ No se realizó el cambio. " +
+            "⚠️ No se hizo ningún cambio.\n\n" +
             usuario +
             " ya está registrado en " +
             (
@@ -1052,47 +1071,43 @@ case "liberado":
           break;
 
 
-        // -------------------------------------------
-        // LECTURA VIEJA
-        // -------------------------------------------
+        // =================================================
+        // LECTURA ANTIGUA
+        // =================================================
 
         case "lectura_antigua":
 
           mostrarEstado(
-            "⏭️ La lectura de " +
-            usuario +
-            " no se aplicó porque ya hubo un cambio más reciente."
+            "ℹ️ Movimiento descartado.\n\n" +
+            "Ya hubo un cambio más reciente en " +
+            lectura.lugar +
+            ", por lo que esta operación pendiente no se aplicó.\n" +
+            "Usuario: " +
+            usuario
           );
 
           break;
 
 
-        // -------------------------------------------
-        // USUARIO ELIMINADO DE SHEETS
-        // -------------------------------------------
+        // =================================================
+        // USUARIO YA NO AUTORIZADO
+        // =================================================
 
         case "usuario_no_autorizado":
 
           mostrarEstado(
-            "⛔ Esta cuenta ya no está autorizada para usar los cajones."
+            "⛔ Movimiento rechazado.\n\n" +
+            "Esta cuenta ya no está autorizada para usar el estacionamiento."
           );
 
           break;
 
 
-        // -------------------------------------------
-        // DISPOSITIVO INVÁLIDO
-        // -------------------------------------------
+        // =================================================
+        // DISPOSITIVO NO AUTORIZADO
+        // =================================================
 
         case "dispositivo_no_autorizado":
-
-          /*
-          Solo llegamos aquí con una lectura NUEVA que sí
-          tenía deviceToken.
-
-          Las lecturas viejas sin deviceToken fueron
-          eliminadas previamente por obtenerPendientes().
-          */
 
           limpiarSesionLocal();
 
@@ -1127,61 +1142,62 @@ case "liberado":
 
 
           mostrarEstado(
-            "🔐 Este dispositivo necesita iniciar sesión nuevamente."
+            "🔐 Necesitamos volver a autorizar este teléfono.\nInicia sesión nuevamente con Google."
           );
 
           break;
 
 
-        // -------------------------------------------
+        // =================================================
         // LUGAR NO ENCONTRADO
-        // -------------------------------------------
+        // =================================================
 
         case "lugar_no_encontrado":
 
           mostrarEstado(
-            "❌ No se encontró el lugar " +
+            "❌ No se realizó el movimiento.\n\n" +
+            "No encontramos el lugar " +
             lectura.lugar +
-            "."
+            " en la tabla del estacionamiento."
           );
 
           break;
 
 
-        // -------------------------------------------
+        // =================================================
         // TAG INVÁLIDA
-        // -------------------------------------------
+        // =================================================
 
         case "lugar_no_valido":
 
           mostrarEstado(
-            "❌ Tag NFC no válido."
+            "❌ NFC no reconocido.\nEste tag no corresponde a un lugar válido."
           );
 
           break;
 
 
-        // -------------------------------------------
+        // =================================================
         // ERROR
-        // -------------------------------------------
+        // =================================================
 
         case "error":
 
           mostrarEstado(
-            "❌ Ocurrió un error al procesar la lectura."
+            "❌ No pudimos completar el movimiento.\nEl registro quedó protegido para evitar un cambio incorrecto."
           );
 
           break;
 
 
-        // -------------------------------------------
-        // OTRO
-        // -------------------------------------------
+        // =================================================
+        // OTRO RESULTADO
+        // =================================================
 
         default:
 
           mostrarEstado(
-            "ℹ️ Resultado: " +
+            "ℹ️ El servidor respondió: " +
             resultado.estado
           );
       }
@@ -1195,8 +1211,7 @@ case "liberado":
 
     function iniciar() {
 
-      // Primero hacemos migración automática de
-      // lecturas antiguas.
+      // Limpiar automáticamente lecturas antiguas
       obtenerPendientes();
 
 
@@ -1204,9 +1219,9 @@ case "liberado":
         obtenerLugar();
 
 
-      // ---------------------------------------------
+      // =================================================
       // SIN SESIÓN
-      // ---------------------------------------------
+      // =================================================
 
       if (
         !sesionLista()
@@ -1237,7 +1252,7 @@ case "liberado":
 
 
         mostrarEstado(
-          "Inicia sesión con tu cuenta de Google."
+          "🔐 Inicia sesión con una cuenta autorizada para usar el estacionamiento."
         );
 
 
@@ -1245,29 +1260,29 @@ case "liberado":
       }
 
 
-      // ---------------------------------------------
+      // =================================================
       // SESIÓN EXISTENTE
-      // ---------------------------------------------
+      // =================================================
 
       mostrarSesion();
 
 
-      // ---------------------------------------------
+      // =================================================
       // PWA ABIERTA SIN NFC
-      // ---------------------------------------------
+      // =================================================
 
       if (!lugar) {
 
         mostrarEstado(
           navigator.onLine
 
-            ? "✅ Sesión lista. Usuario: " +
-              obtenerUsuarioValidado() +
-              "."
+            ? "✅ Sistema listo.\nUsuario: " +
+              obtenerUsuarioValidado()
 
-            : "📴 Aplicación disponible sin conexión. Usuario: " +
-              obtenerUsuarioValidado() +
-              "."
+            : "📴 Sistema disponible sin conexión.\n" +
+              "Los movimientos se guardarán en este teléfono hasta recuperar internet.\n" +
+              "Usuario: " +
+              obtenerUsuarioValidado()
         );
 
 
@@ -1278,9 +1293,9 @@ case "liberado":
       }
 
 
-      // ---------------------------------------------
+      // =================================================
       // LUGAR INVÁLIDO
-      // ---------------------------------------------
+      // =================================================
 
       if (
         ![
@@ -1293,7 +1308,7 @@ case "liberado":
       ) {
 
         mostrarEstado(
-          "❌ Lugar NFC no válido."
+          "❌ Este NFC no corresponde a un lugar válido."
         );
 
 
@@ -1301,9 +1316,9 @@ case "liberado":
       }
 
 
-      // ---------------------------------------------
+      // =================================================
       // REGISTRAR ESCANEO
-      // ---------------------------------------------
+      // =================================================
 
       const resultado =
         guardarLectura(
@@ -1312,10 +1327,7 @@ case "liberado":
 
 
       mostrarEstado(
-        resultado.mensaje +
-        " Lugar: " +
-        lugar +
-        "."
+        resultado.mensaje
       );
 
 
@@ -1337,12 +1349,30 @@ case "liberado":
       "online",
       () => {
 
-        mostrarEstado(
-          "📶 Conexión recuperada. Sincronizando..."
-        );
+        const pendientes =
+          obtenerPendientes();
 
 
-        sincronizarPendientes();
+        if (
+          pendientes.length > 0
+        ) {
+
+          mostrarEstado(
+            "📶 Conexión recuperada.\nSincronizando " +
+            pendientes.length +
+            " movimiento(s) pendiente(s)..."
+          );
+
+
+          sincronizarPendientes();
+
+        } else {
+
+          mostrarEstado(
+            "📶 Conexión recuperada.\nSistema listo.\nUsuario: " +
+            obtenerUsuarioValidado()
+          );
+        }
       }
     );
 
