@@ -56,7 +56,28 @@
       return params.get("lugar");
     }
 
+function manejarGoogleLogin(response) {
+  const payload = JSON.parse(
+    atob(response.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+  );
 
+  const correo = payload.email || "";
+  const nombreGoogle = payload.name || "";
+
+  if (!correo) {
+    document.getElementById("estado").textContent =
+      "❌ No se pudo obtener el correo de Google.";
+    return;
+  }
+
+  localStorage.setItem("correoGoogle", correo);
+  localStorage.setItem("nombreGoogle", nombreGoogle);
+
+  document.getElementById("registroUsuario").style.display = "none";
+
+  iniciar();
+}
+    
     function obtenerUsuario() {
       return localStorage.getItem("usuarioEstacionamiento");
     }
