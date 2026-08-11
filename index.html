@@ -11,7 +11,7 @@
 <body>
   <h1>🚗 Estacionamiento NFC</h1>
 
-  <div id="registroUsuario" style="display:none;">
+  <div id="registroUsuario">
     <p>Selecciona quién usa este teléfono:</p>
 
     <select id="usuario">
@@ -73,15 +73,12 @@ function cambiarUsuario() {
   localStorage.removeItem("ultimaLecturaNFC");
 
   const registro = document.getElementById("registroUsuario");
+  const estado = document.getElementById("estado");
+
   registro.style.display = "block";
+  estado.textContent = "Selecciona nuevamente quién usa este teléfono.";
 
-  document.getElementById("estado").textContent =
-    "Selecciona nuevamente quién usa este teléfono.";
-
-  registro.scrollIntoView({
-    behavior: "smooth",
-    block: "center"
-  });
+  document.getElementById("usuario").value = "";
 }
       
       iniciar();
@@ -203,6 +200,14 @@ function cambiarUsuario() {
       const estado =
         document.getElementById("estado");
 
+const registro = document.getElementById("registroUsuario");
+
+if (usuario) {
+  registro.style.display = "none";
+} else {
+  registro.style.display = "block";
+}
+      
       if (!usuario) {
         estado.textContent =
           "Primero registra este teléfono.";
