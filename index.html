@@ -151,49 +151,134 @@
     }
 
 
-    async function sincronizarPendientes() {
-      if (!navigator.onLine) {
-        return;
+async function sincronizarPendientes() {
+  if (!navigator.onLine) {
+    return;
+  }
+
+  const pendientes = obtenerPendientes();
+
+  if (pendientes.length === 0) {
+    return;
+  }
+
+  const restantes = [];
+
+  for (const lectura of pendientes) {
+    try {
+      // 1. Enviar lectura
+      await fetch(BACKEND_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify({
+          clave: CLAVE_PWA,
+          id: lectura.id,
+          lugar: lectura.lugar,
+          usuario: lectura.usuario,
+          timestamp: lectura.timestamp
+        })
+      });
+
+      // 2. Darle un momento al servidor para procesarla
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      // 3. Consultar resultado real
+      const consulta =
+        BACKEND_URL +
+        "?accion=estado&id=" +
+        encodeURIComponent(lectura.id) +
+        "&t=" +
+        Date.now();
+
+      const respuesta = await fetch(consulta, {
+        method: "GET",
+        cache: "no-store"
+      });
+
+      const datos = await respuesta.json();
+
+      if (!datos.estado || datos.estado === "pendiente") {
+        restantes.push(lectura);
+        continue;
       }
 
-      const pendientes = obtenerPendientes();
+      mostrarResultadoServidor(
+        datos.estado,
+        lectura
+      );
 
-      if (pendientes.length === 0) {
-        return;
-      }
-
-      const restantes = [];
-
-      for (const lectura of pendientes) {
-        try {
-          await fetch(BACKEND_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: {
-              "Content-Type": "text/plain;charset=utf-8"
-            },
-            body: JSON.stringify({
-              clave: CLAVE_PWA,
-              id: lectura.id,
-              lugar: lectura.lugar,
-              usuario: lectura.usuario,
-              timestamp: lectura.timestamp
-            })
-          });
-
-        } catch (error) {
-          restantes.push(lectura);
-        }
-      }
-
-      guardarPendientes(restantes);
-
-      if (restantes.length === 0) {
-        document.getElementById("estado").textContent =
-          "✅ Todo sincronizado correctamente.";
-      }
+    } catch (error) {
+      restantes.push(lectura);
     }
+  }
 
+  guardarPendientes(restantes);
+
+  if (restantes.length > 0) {
+    document.getElementById("estado").textContent =
+      "⏳ Hay " +
+      restantes.length +
+      " lectura(s) pendiente(s) de sincronizar.";
+  }
+}
+
+    function mostrarResultadoServidor(estadoServidor, lectura) {
+  const estado =
+    document.getElementById("estado");
+
+  switch (estadoServidor) {
+
+    case "ocupado":
+      estado.textContent =
+        "🚗 " +
+        lectura.lugar +
+        " quedó ocupado por " +
+        lectura.usuario +
+        ".";
+      break;
+
+    case "liberado":
+      estado.textContent =
+        "✅ " +
+        lectura.lugar +
+        " quedó Libre.";
+      break;
+
+    case "ocupado_por_otro":
+      estado.textContent =
+        "⚠️ No se realizó el cambio. " +
+        lectura.lugar +
+        " está ocupado por otra persona.";
+      break;
+
+    case "usuario_en_otro_lugar":
+      estado.textContent =
+        "⚠️ No se realizó el cambio. " +
+        lectura.usuario +
+        " ya está registrado en otro lugar.";
+      break;
+
+    case "lectura_antigua":
+      estado.textContent =
+        "⏭️ Esta lectura no se aplicó porque ya hubo un cambio más reciente.";
+      break;
+
+    case "lugar_no_encontrado":
+      estado.textContent =
+        "❌ No se encontró el lugar " +
+        lectura.lugar +
+        ".";
+      break;
+
+    default:
+      estado.textContent =
+        "ℹ️ Lectura procesada: " +
+        estadoServidor;
+  }
+}
 
     function iniciar() {
       const lugar = obtenerLugar();
