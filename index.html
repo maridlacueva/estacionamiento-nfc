@@ -21,6 +21,68 @@
     async
     defer>
   </script>
+
+  <style>
+    body {
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
+
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px;
+      line-height: 1.45;
+    }
+
+    h1 {
+      margin-bottom: 24px;
+    }
+
+    #estado {
+      white-space: pre-line;
+      font-size: 17px;
+    }
+
+    #botonCambiarUsuario {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    #correoActual {
+      display: none;
+      margin-top: 25px;
+      font-size: 13px;
+      opacity: 0.7;
+    }
+
+    #avisoCerrar {
+      display: none;
+      margin-top: 28px;
+      padding: 18px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    #avisoCerrar strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    #botonCerrar {
+      margin-top: 12px;
+      padding: 11px 18px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 
@@ -63,11 +125,33 @@
        ESTADO PRINCIPAL
        =================================================== -->
 
-  <p
-    id="estado"
-    style="white-space: pre-line;">
+  <p id="estado">
     Preparando...
   </p>
+
+
+  <!-- ===================================================
+       AVISO DE CIERRE
+       =================================================== -->
+
+  <div id="avisoCerrar">
+
+    <strong>
+      ✅ Operación terminada
+    </strong>
+
+    <div>
+      Ya puedes cerrar esta pestaña.
+    </div>
+
+    <button
+      id="botonCerrar"
+      type="button"
+      onclick="cerrarPestanaManual()">
+      Cerrar esta pestaña
+    </button>
+
+  </div>
 
 
   <!-- ===================================================
@@ -76,28 +160,16 @@
 
   <button
     id="botonCambiarUsuario"
-    onclick="cambiarUsuario()"
-    style="
-      display:none;
-      margin-top:20px;
-    ">
+    onclick="cambiarUsuario()">
     Cambiar usuario
   </button>
 
 
   <!-- ===================================================
-       CORREO ACTUAL - AL FINAL
+       CORREO ACTUAL
        =================================================== -->
 
-  <p
-    id="correoActual"
-    style="
-      display:none;
-      margin-top:25px;
-      font-size:13px;
-      opacity:0.7;
-    ">
-  </p>
+  <p id="correoActual"></p>
 
 
 
@@ -107,7 +179,12 @@
     // CONFIGURACIÓN
     // =====================================================
 
-    const ANTIREBOTE_MS = 30000;
+    const ANTIREBOTE_MS =
+      30000;
+
+
+    const CIERRE_AUTOMATICO_MS =
+      2500;
 
 
     const BACKEND_URL =
@@ -116,6 +193,10 @@
 
     const CLAVE_PWA =
       "ESTACIONAMIENTO_NFC_2026_PWA";
+
+
+    let cierreProgramado =
+      false;
 
 
 
@@ -130,7 +211,11 @@
           window.location.search
         );
 
-      return params.get("lugar");
+
+      return params.get(
+        "lugar"
+      );
+
     }
 
 
@@ -144,6 +229,7 @@
       return localStorage.getItem(
         "correoGoogle"
       );
+
     }
 
 
@@ -152,6 +238,7 @@
       return localStorage.getItem(
         "usuarioValidado"
       );
+
     }
 
 
@@ -160,16 +247,20 @@
       return localStorage.getItem(
         "deviceToken"
       );
+
     }
 
 
     function sesionLista() {
 
       return Boolean(
+
         obtenerCorreo() &&
         obtenerUsuarioValidado() &&
         obtenerDeviceToken()
+
       );
+
     }
 
 
@@ -178,9 +269,14 @@
     // GOOGLE LOGIN
     // =====================================================
 
-    async function manejarGoogleLogin(response) {
+    async function manejarGoogleLogin(
+      response
+    ) {
 
       try {
+
+        ocultarAvisoCerrar();
+
 
         mostrarEstado(
           "🔐 Verificando tu cuenta con Google..."
@@ -194,30 +290,37 @@
         await fetch(
           BACKEND_URL,
           {
-            method: "POST",
 
-            mode: "no-cors",
+            method:
+              "POST",
+
+            mode:
+              "no-cors",
 
             headers: {
+
               "Content-Type":
                 "text/plain;charset=utf-8"
+
             },
 
-            body: JSON.stringify({
+            body:
+              JSON.stringify({
 
-              clave:
-                CLAVE_PWA,
+                clave:
+                  CLAVE_PWA,
 
-              accion:
-                "registrar_dispositivo",
+                accion:
+                  "registrar_dispositivo",
 
-              id:
-                registroId,
+                id:
+                  registroId,
 
-              googleToken:
-                response.credential
+                googleToken:
+                  response.credential
 
-            })
+              })
+
           }
         );
 
@@ -251,8 +354,13 @@
             await fetch(
               consulta,
               {
-                method: "GET",
-                cache: "no-store"
+
+                method:
+                  "GET",
+
+                cache:
+                  "no-store"
+
               }
             );
 
@@ -270,7 +378,9 @@
               datos;
 
             break;
+
           }
+
         }
 
 
@@ -281,6 +391,7 @@
           );
 
           return;
+
         }
 
 
@@ -291,11 +402,13 @@
 
           limpiarSesionLocal();
 
+
           mostrarEstado(
             "⛔ Cuenta no autorizada.\nEste correo no está registrado para usar el estacionamiento."
           );
 
           return;
+
         }
 
 
@@ -306,11 +419,13 @@
 
           limpiarSesionLocal();
 
+
           mostrarEstado(
             "🔐 No pudimos validar la sesión de Google.\nIntenta iniciar sesión nuevamente."
           );
 
           return;
+
         }
 
 
@@ -323,11 +438,13 @@
 
           limpiarSesionLocal();
 
+
           mostrarEstado(
             "❌ No fue posible autorizar este dispositivo.\nIntenta nuevamente."
           );
 
           return;
+
         }
 
 
@@ -374,7 +491,9 @@
         mostrarEstado(
           "❌ No pudimos verificar tu cuenta.\nRevisa tu conexión a internet e intenta nuevamente."
         );
+
       }
+
     }
 
 
@@ -384,6 +503,9 @@
     // =====================================================
 
     function cambiarUsuario() {
+
+      ocultarAvisoCerrar();
+
 
       limpiarSesionLocal();
 
@@ -430,8 +552,11 @@
 
         google.accounts.id
           .disableAutoSelect();
+
       }
+
     }
+
 
 
     function limpiarSesionLocal() {
@@ -440,13 +565,16 @@
         "correoGoogle"
       );
 
+
       localStorage.removeItem(
         "usuarioValidado"
       );
 
+
       localStorage.removeItem(
         "deviceToken"
       );
+
     }
 
 
@@ -471,6 +599,7 @@
       ) {
 
         return;
+
       }
 
 
@@ -505,6 +634,7 @@
         )
         .style.display =
           "inline-block";
+
     }
 
 
@@ -519,23 +649,30 @@
 
         const pendientes =
           JSON.parse(
+
             localStorage.getItem(
               "lecturasPendientes"
             ) || "[]"
+
           );
 
 
-        // Eliminar lecturas antiguas de versiones previas
-        // que no tienen deviceToken.
+        /*
+          Eliminar lecturas antiguas
+          de versiones previas que
+          no tienen deviceToken.
+        */
 
         const validas =
           pendientes.filter(
+
             lectura =>
               lectura &&
               lectura.id &&
               lectura.lugar &&
               lectura.timestamp &&
               lectura.deviceToken
+
           );
 
 
@@ -545,11 +682,15 @@
         ) {
 
           localStorage.setItem(
+
             "lecturasPendientes",
+
             JSON.stringify(
               validas
             )
+
           );
+
         }
 
 
@@ -565,8 +706,11 @@
 
 
         return [];
+
       }
+
     }
+
 
 
     function guardarPendientes(
@@ -574,11 +718,15 @@
     ) {
 
       localStorage.setItem(
+
         "lecturasPendientes",
+
         JSON.stringify(
           pendientes
         )
+
       );
+
     }
 
 
@@ -618,6 +766,7 @@
             "🔐 Inicia sesión con una cuenta autorizada antes de usar el NFC."
 
         };
+
       }
 
 
@@ -633,9 +782,11 @@
 
         ultimaLectura =
           JSON.parse(
+
             localStorage.getItem(
               "ultimaLecturaNFC"
             ) || "null"
+
           );
 
 
@@ -643,6 +794,7 @@
 
         ultimaLectura =
           null;
+
       }
 
 
@@ -652,10 +804,8 @@
 
       if (
         ultimaLectura &&
-        ultimaLectura.lugar ===
-          lugar &&
-        ultimaLectura.usuario ===
-          usuario &&
+        ultimaLectura.lugar === lugar &&
+        ultimaLectura.usuario === usuario &&
         ahora -
           ultimaLectura.timestamp <
           ANTIREBOTE_MS
@@ -671,10 +821,11 @@
             "Espera 30 segundos antes de volver a usar este mismo NFC.\n\n" +
             "Lugar: " +
             lugar +
-             "\nUsuario: " +
-            usuario 
+            "\nUsuario: " +
+            usuario
 
         };
+
       }
 
 
@@ -720,7 +871,9 @@
 
 
       localStorage.setItem(
+
         "ultimaLecturaNFC",
+
         JSON.stringify({
 
           lugar:
@@ -733,6 +886,7 @@
             ahora
 
         })
+
       );
 
 
@@ -771,6 +925,7 @@
           lugar
 
       };
+
     }
 
 
@@ -786,6 +941,7 @@
       ) {
 
         return;
+
       }
 
 
@@ -798,6 +954,7 @@
       ) {
 
         return;
+
       }
 
 
@@ -823,6 +980,7 @@
           await fetch(
             BACKEND_URL,
             {
+
               method:
                 "POST",
 
@@ -855,6 +1013,7 @@
                     lectura.deviceToken
 
                 })
+
             }
           );
 
@@ -888,11 +1047,13 @@
               await fetch(
                 consulta,
                 {
+
                   method:
                     "GET",
 
                   cache:
                     "no-store"
+
                 }
               );
 
@@ -903,15 +1064,16 @@
 
             if (
               datos.estado &&
-              datos.estado !==
-                "pendiente"
+              datos.estado !== "pendiente"
             ) {
 
               resultado =
                 datos;
 
               break;
+
             }
+
           }
 
 
@@ -922,6 +1084,7 @@
             );
 
             continue;
+
           }
 
 
@@ -942,7 +1105,9 @@
           restantes.push(
             lectura
           );
+
         }
+
       }
 
 
@@ -961,7 +1126,9 @@
           " movimiento(s).\n" +
           "Quedaron guardados y volveremos a intentarlo cuando haya conexión."
         );
+
       }
+
     }
 
 
@@ -979,6 +1146,10 @@
         resultado.usuario ||
         lectura.usuario ||
         "Usuario";
+
+
+      let cerrarDespues =
+        false;
 
 
       switch (
@@ -1001,6 +1172,9 @@
             usuario
           );
 
+          cerrarDespues =
+            true;
+
           break;
 
 
@@ -1018,6 +1192,9 @@
             "Usuario: " +
             usuario
           );
+
+          cerrarDespues =
+            true;
 
           break;
 
@@ -1041,6 +1218,9 @@
             usuario
           );
 
+          cerrarDespues =
+            true;
+
           break;
 
 
@@ -1061,6 +1241,9 @@
             "."
           );
 
+          cerrarDespues =
+            true;
+
           break;
 
 
@@ -1078,6 +1261,9 @@
             "Usuario: " +
             usuario
           );
+
+          cerrarDespues =
+            true;
 
           break;
 
@@ -1193,7 +1379,202 @@
             "ℹ️ El servidor respondió: " +
             resultado.estado
           );
+
       }
+
+
+      /*
+        Solo intentamos cerrar automáticamente
+        cuando la lectura NFC ya terminó de forma
+        definitiva y el usuario no necesita
+        volver a autenticarse.
+      */
+
+      if (
+        cerrarDespues &&
+        obtenerLugar()
+      ) {
+
+        programarCierrePestana();
+
+      }
+
+    }
+
+
+
+    // =====================================================
+    // CIERRE AUTOMÁTICO DE PESTAÑA
+    // =====================================================
+
+    function programarCierrePestana() {
+
+      if (
+        cierreProgramado
+      ) {
+
+        return;
+
+      }
+
+
+      cierreProgramado =
+        true;
+
+
+      /*
+        Dejamos unos segundos para que
+        la persona alcance a leer el resultado.
+      */
+
+      setTimeout(
+        () => {
+
+          intentarCerrarPestana();
+
+        },
+        CIERRE_AUTOMATICO_MS
+      );
+
+    }
+
+
+
+    function intentarCerrarPestana() {
+
+      try {
+
+        window.close();
+
+      } catch (error) {
+
+        console.log(
+          "El navegador no permitió cerrar la pestaña:",
+          error
+        );
+
+      }
+
+
+      /*
+        Si window.close() funcionó,
+        esta página desaparecerá y este código
+        ya no será visible.
+
+        Si seguimos aquí unos instantes después,
+        mostramos la instrucción al usuario.
+      */
+
+      setTimeout(
+        () => {
+
+          mostrarAvisoCerrar();
+
+        },
+        500
+      );
+
+    }
+
+
+
+    function cerrarPestanaManual() {
+
+      try {
+
+        window.close();
+
+      } catch (error) {
+
+        console.log(
+          "No fue posible cerrar automáticamente:",
+          error
+        );
+
+      }
+
+
+      /*
+        Algunos navegadores tampoco permiten
+        cerrar desde el botón.
+
+        En ese caso dejamos una instrucción clara.
+      */
+
+      setTimeout(
+        () => {
+
+          const aviso =
+            document.getElementById(
+              "avisoCerrar"
+            );
+
+
+          if (aviso) {
+
+            aviso.style.display =
+              "block";
+
+
+            aviso.innerHTML =
+              "<strong>✅ Operación terminada</strong>" +
+              "<div>El navegador no permite cerrar esta pestaña automáticamente.</div>" +
+              "<div style='margin-top:8px;'>Puedes cerrarla manualmente.</div>";
+
+          }
+
+        },
+        500
+      );
+
+    }
+
+
+
+    function mostrarAvisoCerrar() {
+
+      const aviso =
+        document.getElementById(
+          "avisoCerrar"
+        );
+
+
+      if (!aviso) {
+
+        return;
+
+      }
+
+
+      aviso.style.display =
+        "block";
+
+    }
+
+
+
+    function ocultarAvisoCerrar() {
+
+      cierreProgramado =
+        false;
+
+
+      const aviso =
+        document.getElementById(
+          "avisoCerrar"
+        );
+
+
+      if (!aviso) {
+
+        return;
+
+      }
+
+
+      aviso.style.display =
+        "none";
+
     }
 
 
@@ -1204,7 +1585,13 @@
 
     function iniciar() {
 
-      // Limpiar automáticamente lecturas antiguas.
+      ocultarAvisoCerrar();
+
+
+      /*
+        Limpiar automáticamente lecturas antiguas.
+      */
+
       obtenerPendientes();
 
 
@@ -1250,6 +1637,7 @@
 
 
         return;
+
       }
 
 
@@ -1267,6 +1655,7 @@
       if (!lugar) {
 
         mostrarEstado(
+
           navigator.onLine
 
             ? "✅ Sistema listo.\nUsuario: " +
@@ -1276,6 +1665,7 @@
               "Los movimientos se guardarán en este teléfono hasta recuperar internet.\n\n" +
               "Usuario: " +
               obtenerUsuarioValidado()
+
         );
 
 
@@ -1283,6 +1673,7 @@
 
 
         return;
+
       }
 
 
@@ -1306,6 +1697,7 @@
 
 
         return;
+
       }
 
 
@@ -1329,7 +1721,9 @@
       ) {
 
         sincronizarPendientes();
+
       }
+
     }
 
 
@@ -1360,6 +1754,7 @@
 
           sincronizarPendientes();
 
+
         } else {
 
           mostrarEstado(
@@ -1368,7 +1763,9 @@
             "Usuario: " +
             obtenerUsuarioValidado()
           );
+
         }
+
       }
     );
 
@@ -1388,10 +1785,14 @@
         )
         .textContent =
           mensaje;
+
     }
 
 
-    function esperar(ms) {
+
+    function esperar(
+      ms
+    ) {
 
       return new Promise(
         resolve =>
@@ -1400,6 +1801,7 @@
             ms
           )
       );
+
     }
 
 
@@ -1435,6 +1837,7 @@
 
           }
         );
+
     }
 
   </script>
